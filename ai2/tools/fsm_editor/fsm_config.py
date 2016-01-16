@@ -8,7 +8,7 @@ class FsmConfig(ConfigModule):
         cdir = os.path.abspath(os.getcwd())
         d = {
             "export_path": os.path.join(cdir, "export"),
-            "src_path": os.path.join(cdir, "src"),
+            "src_path": os.path.join(cdir, "fsms"),
         }
         return d
 

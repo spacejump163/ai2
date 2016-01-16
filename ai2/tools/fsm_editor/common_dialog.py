@@ -168,7 +168,7 @@ class ListEditPanelVM(object):
 
     def delete_handler(self):
         i = self.get_selection_index()
-        if i is None:
+        if i == -1:
             return
         self.dtor(self.model_list[i])
         self.refresh()

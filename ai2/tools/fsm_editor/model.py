@@ -1,4 +1,5 @@
 # -*- encoding: utf-8 -*-
+import os
 import pickle
 import pprint
 
@@ -131,9 +132,11 @@ class FsmModel(object):
         return states, initial_state_index, events, edges
 
     def dump_file(self, path):
-        f = open(path, "wb")
-        pickle.dump(self, f)
-        f.close()
+        pdir = os.path.dirname(path)
+        if not os.path.exists(pdir):
+            os.makedirs(pdir)
+        with open(path, "wb") as ofile:
+            pickle.dump(self, ofile)
 
     @staticmethod
     def load_file(path):
@@ -258,9 +261,11 @@ class FsmModelPythonExporter(object):
             GRAPH_DICT=graph_dict
         )
         if file_path:
-            f = open(file_path, "wb")
-            f.write(bytes(body, "utf-8"))
-            f.close()
+            pdir = os.path.dirname(file_path)
+            if not os.path.exists(pdir):
+                os.makedirs(pdir)
+            with open(file_path, "w", encoding="utf-8") as ofile:
+                ofile.write(body)
         else:
             print(body)
 
