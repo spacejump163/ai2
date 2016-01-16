@@ -145,6 +145,13 @@ class ListEditPanelVM(object):
         else:
             return -1
 
+    def get_selection_position(self):
+        a = self.window.view.currentIndex()
+        if a.isValid():
+            return a.row(), a.column()
+        else:
+            return None
+
     def set_selection(self, i):
         idx = self.container_vm.createIndex(i, 0, self.model_list[i])
         self.window.view.setCurrentIndex(idx)
@@ -161,6 +168,8 @@ class ListEditPanelVM(object):
 
     def delete_handler(self):
         i = self.get_selection_index()
+        if i is None:
+            return
         self.dtor(self.model_list[i])
         self.refresh()
 

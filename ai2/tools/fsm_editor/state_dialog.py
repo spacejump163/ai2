@@ -130,6 +130,9 @@ class StateListPanelVM(cdialog.ListEditPanelVM):
         #self.window.view.doubleClicked = self.edit_handler
 
     def edit_handler(self):
+        ret = self.get_selection_position()
+        if ret is None or ret[1] == 0:
+            return
         i = self.get_selection_index()
         state_item = self.model_list[i]
         dialog = StateDetailDialogVM(state_item)

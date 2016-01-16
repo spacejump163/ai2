@@ -16,6 +16,7 @@ class InstanceVM(object):
         self.modified = False
         self.model = model
         self.table_vm = InstanceTableModel(model)
+        self.table_vm.modified.connect(self.set_dirty)
         self.table_view = QTableView()
         self.table_view.show()
         self.table_view.closeEvent = self.close_handler
@@ -25,7 +26,7 @@ class InstanceVM(object):
         self.sub_window.instance = self
         self.sub_window.setAttribute(Qt.WA_DeleteOnClose)
         self.table_view.setAttribute(Qt.WA_DeleteOnClose)
-        self.sub_window.setWindowTitle(self.file_path + "[*]")
+        self.update_title()
         self.sub_window.closeEvent = self.close_handler
         parent.instances.append(self)
 
@@ -35,6 +36,9 @@ class InstanceVM(object):
     def set_modified(self, b):
         self.modified = b
         self.sub_window.setWindowModified(b)
+
+    def update_title(self):
+        self.sub_window.setWindowTitle(self.file_path + "[*]")
 
     def close_handler(self, ev):
         if not self.modified:
@@ -48,10 +52,10 @@ class InstanceVM(object):
 
 
 class InstanceTableModel(QAbstractTableModel):
+    modified = pyqtSignal()
     def __init__(self, data_source):
         super(InstanceTableModel, self).__init__()
         self.data_source = data_source
-        self.modified = pyqtSignal()
 
     def rowCount(self, parent=QModelIndex(), *args, **kwargs):
         return len(self.data_source.state)
@@ -89,13 +93,13 @@ class InstanceTableModel(QAbstractTableModel):
             col = idx.column()
             sid = self.data_source.state[row].uid
             eid = self.data_source.event[col].uid
-            self.modfied.emit()
+            self.modified.emit()
             if value == "":
                 self.data_source.remove_edge(sid, eid)
                 self.dataChanged.emit(self.index(row, col), self.index(row + 1, col + 1))
                 return True
             else:
-                did = self.data_source.get_uid_from_name(value)
+                did = self.data_source.get_uid_from_item_name("state", value)
                 if did is None:
                     return False
                 self.data_source.add_edge(sid, eid, did)
@@ -109,5 +113,5 @@ class InstanceTableModel(QAbstractTableModel):
 
     def refresh(self):
         self.modelReset.emit()
-        self.modfied.emit()
+        self.modified.emit()
 

@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 import sys
 import os
-
+import pickle
 import functools
 
 from PyQt5.QtCore import QSignalMapper, Qt
@@ -10,10 +10,11 @@ from PyQt5.QtWidgets import QAction, QApplication, QTableView, QTabWidget, QMdiA
 from PyQt5.uic import loadUi
 
 from ai2.tools.fsm_editor.instance_vm import InstanceVM
-from ai2.tools.fsm_editor.model import FsmModel, EventItem, StateItem
+from ai2.tools.fsm_editor.model import FsmModel, EventItem, StateItem, FsmModelPythonExporter
 from ai2.tools.fsm_editor.common_dialog import \
     SimpleListModel, MultiColumnListModel, ListEditPanelVM
 from ai2.tools.fsm_editor.state_dialog import StateListPanelVM
+from ai2.tools.fsm_editor.fsm_config import config
 
 this_path = os.path.dirname(__file__)
 MAIN_UI_PATH = os.path.join(this_path, "../../../res/gui/fsm_main.ui")
@@ -58,6 +59,7 @@ class EditorMainWindow(object):
         self.widget.actionSave_As.triggered.connect(self.action_save_as_handler)
         self.widget.actionClose.triggered.connect(self.action_close_handler)
         self.widget.actionClose_All.triggered.connect(self.action_close_all_handler)
+        self.widget.actionExport.triggered.connect(self.action_export_handler)
 
         self.widget.actionStates.triggered.connect(self.action_states_handler)
         self.widget.actionEvents.triggered.connect(self.action_events_handler)
@@ -71,8 +73,16 @@ class EditorMainWindow(object):
     def init_instance(self):
         self.instances = []
 
+    def find_non_existing_name(self):
+        while True:
+            tmp_path = os.path.join(
+                config.src_path,
+                "NewFsm" + str(self.get_seq()) + FSM_FILE_EXT)
+            if not os.path.exists(tmp_path):
+                return tmp_path
+
     def action_new_handler(self):
-        tmp_path = "NewFsm" + str(self.get_seq()) + FSM_FILE_EXT
+        tmp_path = self.find_non_existing_name()
         m = FsmModel()
         m.default_init()
         vm = InstanceVM(m, self, tmp_path)
@@ -82,6 +92,7 @@ class EditorMainWindow(object):
         p = QFileDialog()
         p.setViewMode(QFileDialog.List)
         p.setFileMode(QFileDialog.ExistingFiles)
+        p.setDirectory(config.src_path)
         p.exec()
         paths = p.selectedFiles()
         for pth in paths:
@@ -103,23 +114,39 @@ class EditorMainWindow(object):
 
         p = QFileDialog()
         p.setViewMode(QFileDialog.List)
+        p.setDirectory(config.src_path)
         p.exec()
         paths = p.selectedFiles()
         if len(paths) == 0:
             return
         w.instance.file_path = os.path.abspath(paths[0])
+        w.instance.update_title()
         model = w.instance.model
         model.dump_file(w.instance.file_path)
         w.instance.set_modified(False)
+
 
     def action_close_handler(self):
         w = self.mdi.activeSubWindow()
         if w is None:
             return
-        w.instance.close_handler()
+        w.close()
 
     def action_close_all_handler(self):
         self.mdi.closeAllSubWindows()
+
+    def action_export_handler(self):
+        fsm_files = os.listdir(config.src_path)
+        for fn in fsm_files:
+            full_name = os.path.join(config.src_path, fn)
+            b, e = os.path.splitext(full_name)
+            if e == FSM_FILE_EXT:
+                f = open(full_name, "rb")
+                basename, e = os.path.splitext(fn)
+                model_object = pickle.load(f)
+                f.close()
+                exporter = FsmModelPythonExporter(model_object)
+                exporter.export(os.path.join(config.export_path, basename + "_fsm.py"))
 
     def action_states_handler(self):
         cur = self.get_current_instance()

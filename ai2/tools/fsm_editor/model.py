@@ -119,7 +119,8 @@ class FsmModel(object):
 
     def to_tuple(self):
         states = tuple([st.to_tuple() for st in self.state])
-        initial_state_index = self.get_item_index_from_uid("state", self.default_state_uid)
+        #initial_state_index = self.get_item_index_from_uid("state", self.default_state_uid)
+        initial_state_index = 0
         events = tuple([ev.name for ev in self.event])
         edges = {}
         for k, v in self.edge.items():
