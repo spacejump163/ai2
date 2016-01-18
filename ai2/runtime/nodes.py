@@ -28,7 +28,7 @@ class Node(object):
 
     def _quick_finish(self, retval):
         """
-        this is only to be used by nodes not action,
+        this is only to be used by internal nodes other than user action nodes,
         at the end of this method, agent will be polled since
         some event may just have happened
         """
