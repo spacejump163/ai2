@@ -7,6 +7,45 @@ import ai2.runtime.agent as agent
 logger = logging.getLogger("ai")
 
 
+def state_machine0():
+    """
+    this test 1 level state and fire_event triggered state transition
+    """
+    logger.debug(">>>>")
+    ta = agent.ActionAgent()
+    ta.set_fsm("state_machine_test.two_states_fsm")
+    ta.enable(True)
+    assert(ta.blackboard["current_state"]) == "start"
+    logger.debug("event e")
+    ta.fire_event("e")
+    assert(ta.blackboard["current_state"]) == "end"
+    logger.debug("event s")
+    ta.fire_event("s")
+    assert(ta.blackboard["current_state"]) == "start"
+    logger.debug("event t")
+    ta.fire_event("t")
+    assert(ta.blackboard["current_state"]) == "end"
+
+
+def state_machine1():
+    """
+    this test multi level states and state transition
+    """
+    logger.debug(">>>>")
+    ta = agent.ActionAgent()
+    ta.set_fsm("state_machine_test.lv0_fsm")
+    ta.enable(True)
+    assert(ta.blackboard["state"]) == "s00"
+    ta.fire_event("e1")
+    assert(ta.blackboard["state"]) == "s10"
+    ta.fire_event("e3")
+    assert(ta.blackboard["state"]) == "s11"
+    ta.fire_event("e2")
+    assert(ta.blackboard["state"]) == "s02"
+    ta.fire_event("e2")
+    assert(ta.blackboard["state"]) == "s02"
+
+
 def sequence0():
     logger.debug(">>>>")
     ta = agent.Agent()
@@ -193,3 +232,9 @@ def test_all():
 
     #assert(False)
     logger.debug(">>> finished")
+
+def new_test():
+    logging.basicConfig(level=logging.DEBUG)
+    loader.prefix = "ai2.test."
+    state_machine0()
+    state_machine1()

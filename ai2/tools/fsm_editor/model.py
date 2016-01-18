@@ -154,7 +154,7 @@ class StateItem(object):
     def to_tuple(self):
         enters = tuple([act.to_tuple() for act in self.enter_actions])
         leaves = tuple([act.to_tuple() for act in self.leave_actions])
-        return self.name, enters, leaves
+        return enters, leaves, self.name
 
     def add_item(self, category, ins_pos=None):
         item_list = getattr(self, category)

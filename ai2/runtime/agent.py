@@ -4,6 +4,7 @@ import collections
 import ai2.runtime.fsm as fsm
 import ai2.runtime.nodes as nodes
 import ai2.runtime.defs as defs
+import ai2.runtime.loader as loader
 
 logger = logging.getLogger("ai")
 
@@ -90,18 +91,10 @@ class Agent(object):
     def enable_debug(self):
         raise NotImplemented
 
-    def log(self, msg):
-        logger.debug("%s" % self + msg)
-
-    def node_action(self, node, method_name, arg_list):
+    def agent_action(self, node, method_name, arg_list):
         f = getattr(self, method_name)
         args = [self.get_value(i) for i in arg_list]
         return f(node, *args)
-
-    def fsm_action(self, method_name, arg_list):
-        f = getattr(self, method_name)
-        args = [self.get_value(i) for i in arg_list]
-        return f(*args)
 
     def get_value(self, tup):
         if tup[0] == defs.PAR_CONST:
@@ -232,3 +225,20 @@ class Agent(object):
             ret1 = self.poll_fronts()
             if ret0 is False and ret1 is False:
                 break
+
+
+class ActionAgent(Agent):
+    def log(self, node, msg):
+        logger.debug("%s:%s:%s" % (self, node,  msg))
+
+    def push_fsm(self, node, fsm_name):
+        nfsm = fsm.Fsm(fsm_name)
+        nfsm.push_self(self)
+
+    def push_tree(self, node, tree_name):
+        c = loader.get_root_desc(tree_name)
+        self.push_node(None, 0, c)
+
+    def set_blackboard(self, node, dst_name, expression):
+        val = eval(expression, None, None)
+        self.set_value((defs.PAR_BB, dst_name, val))

@@ -48,6 +48,8 @@ class Fsm(object):
         nstate = defs.StateDesc(*self.desc.states[self.current_state_index])
         enter_actions = nstate.enter_actions  # enter state actions
         for a in enter_actions:
+            self.agent.agent_action(self, a[0], a[1:])
+            """
             if a[0] == defs.SA_GRAPH:
                 nfsm = Fsm(a[1])
                 nfsm.push_self(self.agent)  # recursively
@@ -58,6 +60,7 @@ class Fsm(object):
                 self.agent.fsm_action(a[1], a[2:])
             else:
                 assert(False)
+            """
 
     def _leave_state(self, state_index=None):
         if self.agent.btree is not None:
@@ -68,8 +71,11 @@ class Fsm(object):
         cstate = defs.StateDesc(*self.desc.states[state_index])
         leave_actions = cstate.leave_actions
         for a in leave_actions:
+            """
             assert(a[0] == defs.SA_CALL)
             self.agent.action(a[1], a[2:])
+            """
+            self.agent.agent_action(self, a[0], a[1:])
         self.current_state_index = None
 
     def transfer_state(self, state_index):

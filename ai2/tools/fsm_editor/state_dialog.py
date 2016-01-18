@@ -48,7 +48,17 @@ class StateDetailDialogVM(object):
             lay.addWidget(edit_panel)
             self.edit_panels.append(edit_panel)
         for i in range(0, 2):
-            self.edit_panels[i].view.currentChanged = functools.partial(self.selection_changed_handler, i)
+            self.edit_panels[i].view.currentChanged = functools.partial(self.list_selection_changed_handler, i)
+            self.edit_panels[i].view.focusInEvent = functools.partial(self.list_focus_in_handler, i)
+
+    def list_focus_in_handler(self, i, *args, **kwargs):
+        idx = self.edit_panels[i].view.currentIndex()
+        if not idx.isValid():
+            return
+        self.selection_changed_handler(i, idx)
+
+    def list_selection_changed_handler(self, i, idx, old_idx):
+        self.selection_changed_handler(i, idx)
 
     def init_action_list_vm(self, category, window):
         action_list = getattr(self.state_item, category)
@@ -102,7 +112,7 @@ class StateDetailDialogVM(object):
         self.window.exec()
         pass
 
-    def selection_changed_handler(self, widget_idx, idx, idx_old):
+    def selection_changed_handler(self, widget_idx, idx):
         item_list = None
         if widget_idx == 0:
             item_list = self.state_item.enter_actions

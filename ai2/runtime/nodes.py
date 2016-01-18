@@ -378,13 +378,13 @@ class Action(Node):
         self.block()  # this is the default action
         action_name = self.desc.data[0][0]
         action_args = self.desc.data[0][1:]
-        self.agent.node_action(self, action_name, action_args)
+        self.agent.agent_action(self, action_name, action_args)
 
     def leave(self):
         if len(self.desc.data) == 2:
             action_name = self.desc.data[1][0]
             action_args = self.desc.data[1][1:]
-            self.agent.node_action(self, action_name, action_args)
+            self.agent.agent_action(self, action_name, action_args)
 
 
 class Compute(Node):

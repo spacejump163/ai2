@@ -212,8 +212,8 @@ class App(object):
     def init_game(self):
         self.arena = Arena()
         self.arena.set_scene(self.scene)
-        missle = Missile(QPointF(0, 0), 0, 10)
-        self.arena.add(missle)
+        missile = Missile(QPointF(0, 0), 0, 10)
+        self.arena.add(missile)
 
     def run(self):
         self.app.exec_()

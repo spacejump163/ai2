@@ -34,8 +34,10 @@ class ConfigModule(object):
         with open(self.path, "r", encoding="utf-8") as infile:
             self._dict = json.load(infile)
 
+    """
     def __del__(self):
         self.dump()
+    """
 
 
 if __name__ == "__main__":
