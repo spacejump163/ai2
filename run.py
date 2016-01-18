@@ -9,6 +9,7 @@ if __name__ == "__main__":
     #cdialog.test_event()
     #pdialog.test()
 
-    view.start_main()
+    #view.start_main()
     #test.new_test()
+
     pass

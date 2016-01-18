@@ -11,7 +11,7 @@ UNIT = 20.0
 
 
 class CannonGraphics(QGraphicsItem):
-    BODY = QRectF(-0.75 * UNIT, -0.75 * UNIT, 1.5 * UNIT, 2.0 * UNIT)
+    BODY = QRectF(-2.0 * UNIT, -2.0 * UNIT, 4.0 * UNIT, 4.0 * UNIT)
     HEAD = QRectF(-0.75 * UNIT, -0.75 * UNIT, 1.5 * UNIT, 1.5 * UNIT)
     CANNON = QRectF(-0.2 * UNIT, 0.5 * UNIT, 0.4 * UNIT, 1.5 * UNIT)
     def __init__(self, color):
@@ -76,10 +76,11 @@ class GameObject(object):
         self.alive = True
         self.arena = None
         self.position = QPointF()
-        self.orientation = 0
+        self.rotation = 0
         self.move_speed = 0
         self.rotate_speed = 0
         self.graphics = None
+        self.group = -1
 
     def start(self):
         pass
@@ -95,13 +96,13 @@ class GameObject(object):
         self.update_graphics()
 
     def update_logic(self):
-        dv = QPointF(math.cos(self.orientation), math.sin(self.orientation))
-        dv *= self.move_speed
+        dv = QPointF(math.cos(self.rotation), math.sin(self.rotation))
+        dv *= self.move_speed * self.arena.dt
         self.position += dv
-        self.orientation += self.rotate_speed
+        self.rotation += self.rotate_speed * self.arena.dt
 
     def update_graphics(self):
-        a = math.degrees(self.orientation) - 90
+        a = math.degrees(self.rotation) - 90
         self.graphics.setRotation(a)
         self.graphics.setPos(self.position)
 
@@ -110,31 +111,63 @@ class GameObject(object):
 
 
 class Tank(GameObject):
-    def __init__(self):
+    FIRE_CD = 1.0
+    def __init__(self, color, group):
         super(Tank, self).__init__()
         self.graphics = QGraphicsItemGroup()
-        self.body_graphics = TankGraphics()
+        self.body_graphics = TankGraphics(color)
         self.graphics.addToGroup(self.body_graphics)
-        self.cannon_graphics = CannonGraphics()
+        self.cannon_graphics = CannonGraphics(color)
         self.graphics.addToGroup(self.cannon_graphics)
 
         self.cannon_rotation = 0
         self.cannon_rotation_speed = 0
+        self.group = group
+        self.hp = 100
+
+        self.fire_cd = 0
 
     def start(self):
         self.move_forward(10)
 
-    def update(self):
-        pass
+    def update_logic(self):
+        super(Tank, self).update_logic()
+        self.cannon_rotation += self.cannon_rotation_speed * self.arena.dt
+        self.fire_cd -= self.arena.dt
 
-    def cleanup(self):
-        pass
+    def update_graphics(self):
+        super(Tank, self).update_graphics()
+        a = math.degrees(self.cannon_rotation)
+        self.cannon_graphics.setRotation(a)
+
+    def get_world_aiming(self):
+        return self.rotation + self.cannon_rotation
 
     def adjust_aim_clockwise(self, w):
-        pass
+        self.cannon_rotation_speed = w
 
-    def action_fire(self):
-        pass
+    def open_fire(self):
+        if self.fire_cd <= 0:
+            self.fire_cd = self.FIRE_CD
+            orient = self.get_world_aiming()
+            dv = QPointF(math.cos(orient), math.sin(orient)) * 2.5 * UNIT
+            pos = self.position + dv
+            m = Missile(pos, orient, 10 * UNIT)
+            self.arena.add(m)
+            return True
+        else:
+            return False
+
+    def update(self):
+        super(Tank, self).update()
+        self.move_speed = 50
+        self.rotate_speed = 0
+        self.open_fire()
+
+    def take_damage(self, dmg):
+        self.hp -= dmg
+        if self.hp <= 0:
+            self.cleanup()
 
 
 class Missile(GameObject):
@@ -142,23 +175,43 @@ class Missile(GameObject):
         super(Missile, self).__init__()
         self.graphics = MissileGraphics(color)
         self.position = pos
-        self.orientation = orient
+        self.rotation = orient
         self.move_speed = speed
+        self.ttl = 1
+        self.damage = 10
+
+    def update(self):
+        super(Missile, self).update()
+        self.ttl -= self.arena.dt
+        if self.ttl < 0:
+            self.cleanup()
+        else:
+            self.check_explode()
+
+    def check_explode(self):
+        targets = self.arena.get_enemies_in_range(self, UNIT * 2)
+        if len(targets) == 0:
+            return
+        for t in targets:
+            if hasattr(t, "take_damage"):
+                t.take_damage(self.damage)
+        self.cleanup()
 
 
 class Arena(object):
-    GAME_PERIOD = 1000.0 / 33
+    GAME_PERIOD = 1.0 / 30
     def __init__(self):
         self.children = []
         self.new_children = []
         self.clock = None
         self.time = 0
+        self.dt = self.GAME_PERIOD
 
     def start(self):
         if self.clock is None:
             self.clock = QTimer()
             self.clock.timeout.connect(self.update)
-            self.clock.start(self.GAME_PERIOD)
+            self.clock.start(self.dt * 1000)
 
     def pause(self):
         self.clock.stop()
@@ -178,11 +231,28 @@ class Arena(object):
         for c in self.children:
             if c.alive:
                 self.new_children.append(c)
+            else:
+                self.scene.removeItem(c.graphics)
         self.children = self.new_children
         self.new_children = []
 
     def set_scene(self, scene):
         self.scene = scene
+
+    def get_enemies_in_range(self, obj, radius):
+        enemies = []
+        group = obj.group
+        point = obj.position
+        for c in self.children:
+            if c.alive and c.group != group:
+                dv = c.position - point
+                x = dv.x()
+                y = dv.y()
+                r = math.sqrt(x * x + y * y)
+                if r < radius:
+                    enemies.append(c)
+        return enemies
+
 
 class App(object):
     def __init__(self):
@@ -201,7 +271,7 @@ class App(object):
         scene.setItemIndexMethod(QGraphicsScene.NoIndex)
 
         view = self.view = QGraphicsView(scene)
-        view.setGeometry(100, 100, 800, 600)
+        view.setGeometry(100, 100, 800, 800)
         view.setRenderHint(QPainter.Antialiasing)
         #view.setBackgroundBrush(QBrush(QColor(0, 255, 0), Qt.CrossPattern))
         view.setCacheMode(QGraphicsView.CacheBackground)
@@ -212,8 +282,21 @@ class App(object):
     def init_game(self):
         self.arena = Arena()
         self.arena.set_scene(self.scene)
-        missile = Missile(QPointF(0, 0), 0, 10)
-        self.arena.add(missile)
+        #missile = Missile(QPointF(0, 0), 0, 400)
+        #self.arena.add(missile)
+
+        tank0 = Tank(QColor(0, 255, 0, 255), 1)
+        tank0.position = QPointF(0, UNIT * 10)
+        tank0.rotation = math.pi * 3 / 2
+        tank0.hp = 20
+        #tank.adjust_aim_clockwise(math.pi / 2)
+        self.arena.add(tank0)
+
+        tank1 = Tank(QColor(0, 255, 255, 255), 2)
+        tank1.position = QPointF(0, 0)
+        tank1.rotation = math.pi / 2
+        #tank.adjust_aim_clockwise(math.pi / 2)
+        self.arena.add(tank1)
 
     def run(self):
         self.app.exec_()
@@ -222,6 +305,9 @@ class App(object):
         self.arena.update()
 
 
-if __name__ == "__main__":
+def run_game():
     app = App()
     app.run()
+
+if __name__ == "__main__":
+    run_game()
