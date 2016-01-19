@@ -88,6 +88,13 @@ class EditorMainWindow(object):
         vm = InstanceVM(m, self, tmp_path)
         vm.set_modified(True)
 
+    def file_already_open(self, pth):
+        for i in self.instances:
+            pth = os.path.abspath(pth)
+            if pth == i.file_path:
+                return i
+        return None
+
     def action_open_handler(self):
         p = QFileDialog()
         p.setViewMode(QFileDialog.List)
@@ -96,8 +103,12 @@ class EditorMainWindow(object):
         p.exec()
         paths = p.selectedFiles()
         for pth in paths:
-            m = FsmModel.load_file(pth)
-            vm = InstanceVM(m, self, pth)
+            i = self.file_already_open(pth)
+            if i:
+                self.mdi.setActiveSubWindow(i.sub_window)
+            else:
+                m = FsmModel.load_file(pth)
+                vm = InstanceVM(m, self, pth)
 
     def action_save_handler(self):
         w = self.mdi.activeSubWindow()
