@@ -242,3 +242,7 @@ class ActionAgent(Agent):
     def set_blackboard(self, node, dst_name, expression):
         val = eval(expression, None, None)
         self.set_value((defs.PAR_BB, dst_name, val))
+
+    to_export = {log, push_fsm, push_tree, set_blackboard}
+
+to_export = {ActionAgent}
