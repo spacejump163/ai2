@@ -175,6 +175,8 @@ class ListEditPanelVM(object):
 
     def move_selection(self, si, step):
         assert(step == 1 or step == -1)
+        if si == -1:
+            return -1
         if si == 0 and step == -1:
             return si
         if si == len(self.model_list) - 1 and step == 1:
@@ -186,12 +188,16 @@ class ListEditPanelVM(object):
 
     def up_handler(self):
         i = self.get_selection_index()
+        if i == -1:
+            return
         ret = self.move_selection(i, -1)
         self.refresh()
         self.set_selection(ret)
 
     def down_handler(self):
         i = self.get_selection_index()
+        if i == -1:
+            return
         ret = self.move_selection(i, 1)
         self.refresh()
         self.set_selection(ret)
