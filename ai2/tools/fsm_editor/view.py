@@ -201,7 +201,7 @@ class EditorMainWindow(object):
         assert(False)  # there is an active sub window but there's no matching instance
 
 
-def start_main():
+def run():
     app = QApplication(sys.argv)
     ex = EditorMainWindow()
     app.exec_()

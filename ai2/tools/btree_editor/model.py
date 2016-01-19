@@ -134,7 +134,7 @@ class CodeFragment(object):
         self.code = code
 
     def __repr__(self):
-        body = self.compile_template.format(CODE_BODY=self.code)
+        body = self.compile_template.format(CODE_BODY=repr(self.code))
         return body
 
 
@@ -249,7 +249,7 @@ class BTreeModelPythonExporter(object):
         body = "".join(frags)
         if file_path:
             pdir = os.path.dirname(file_path)
-            if not os.path.exists(pdir):
+            if pdir != "" and not os.path.exists(pdir):
                 os.makedirs(pdir)
             with open(file_path, "w", encoding="utf-8") as ofile:
                 ofile.write(body)
@@ -269,7 +269,7 @@ class BTreeModelPythonExporter(object):
         frags.append(frag)
 
 
-def test():
+def run():
     model = BTreeModel()
     seq0 = model.add_node(model.root, SequenceModel, 0)
     model.add_node(seq0, ComputeModel, 0)
@@ -279,4 +279,4 @@ def test():
     model.add_node(seq1, ActionModel, 0)
     model.add_node(seq1, ActionModel, 1)
     exporter = BTreeModelPythonExporter(model)
-    exporter.export()
+    exporter.export("btree_export.py")
