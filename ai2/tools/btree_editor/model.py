@@ -128,7 +128,7 @@ class SymbolName(object):
 
 
 class CodeFragment(object):
-    compile_template = """compile({CODE_BODY}, <string>, "exec")"""
+    compile_template = """compile({CODE_BODY}, "<string>", "exec")"""
 
     def __init__(self, code):
         self.code = code

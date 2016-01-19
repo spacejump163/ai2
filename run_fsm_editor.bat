@@ -1,0 +1,1 @@
+C:\Python34\python.exe run.py "ai2.tools.fsm_editor.view"

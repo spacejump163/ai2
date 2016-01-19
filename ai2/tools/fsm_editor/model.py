@@ -68,7 +68,8 @@ class FsmModel(object):
     def remove_state(self, state):
         to_del = set()
         for sid, eid in self.edge.keys():
-            if sid == state.uid:
+            did = self.edge[(sid, eid)]
+            if sid == state.uid or did == state.uid:
                 to_del.add((sid, eid))
         for k in to_del:
             del self.edge[k]
