@@ -142,6 +142,29 @@ class BTreeEditorMainWindow(object):
                 exporter = BTreeModelPythonExporter(model_object)
                 exporter.export(os.path.join(config.export_path, basename + "_btree.py"))
 
+    def action_insert_handler(self):
+        pass
+
+    def action_delete_handler(self):
+        pass
+
+    def action_copy_handler(self):
+        pass
+
+    def action_paste_handler(self):
+        pass
+
+    def action_cut_handler(self):
+        pass
+
+
+    def action_copy_handler(self):
+        pass
+
+    def action_paste_handler(self):
+        pass
+
+
 
 def run():
     app = QApplication(sys.argv)

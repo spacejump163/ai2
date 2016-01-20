@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import \
     QGraphicsView, QGraphicsItem, \
     QGraphicsItemGroup, QGraphicsSimpleTextItem
 from PyQt5.QtCore import QRectF, Qt, QPointF, QTimer, QPoint, QLineF
-from PyQt5.QtGui import QPainterPath, QTransform, QColor, QBrush, QPainter
+from PyQt5.QtGui import QPainterPath, QTransform, QColor, QBrush, QPainter, QPen
 
 import ai2.tools.btree_editor.model as model
 
@@ -181,17 +181,6 @@ class BasicNode(QGraphicsItemGroup):
             pass
         return super(BasicNode, self).itemChange(change, value)
 
-    """
-    def boundingRect(self):
-        rect = super(BasicNode, self).boundingRect()
-        c = rect.center()
-        r = QPointF(rect.width() / 2, rect.height() / 2)
-        c0 = c - r * 1.2
-        c1 = c + r * 1.2
-        nrect = QRectF(c0, c1)
-        return nrect
-    """
-
     def get_width(self):
         return self.boundingRect().width()
 
@@ -210,6 +199,7 @@ class BasicNode(QGraphicsItemGroup):
 
     def contextMenuEvent(self, ev, *args, **kwargs):
         print("context menu event for %s" % (self))
+
 
 class TreeNodeLayouter(object):
     def __init__(self, root):
@@ -271,11 +261,71 @@ class TreeNodeLayouter(object):
         for c in node.children:
             self.layout_node_rec(c)
 
-"""
-def run():
-    app = QApplication(sys.argv)
-    mainWindow = TestWindow()
-    mainWindow.setGeometry(100, 100, 800, 600)
-    mainWindow.show()
-    app.exec_()
-"""
+
+class NodeEditorVM(object):
+    def __init__(self, model, view, scene):
+        self.view = view
+        self.scene = scene
+        self.model = model
+
+    def clear(self):
+        self.scene.clear()
+
+    def display_tree_model(self):
+        root = self.build_tree(self.model.root)
+        layouter = TreeNodeLayouter(root)
+        layouter.run()
+        self.display_links_rec(root)
+
+    def display_links_rec(self, cur):
+        spos = cur.right_pos()
+        for c in cur.children:
+            dpos = c.left_pos()
+            l = self.scene.addLine(QLineF(spos, dpos))
+            l.setZValue(1.0)
+            self.display_links_rec(c)
+
+    def build_tree(self, node):
+        chs = []
+        for c in node.children:
+            t = self.build_tree(c)
+            chs.append(t)
+        n = self.build_node_from_model(node)
+        n.children = chs
+        return n
+
+    def build_node_from_model(self, model):
+        n = BasicNode(model, self)
+        self.scene.addItem(n)
+        return n
+
+    def refresh(self):
+        self.clear()
+        self.display_tree_model()
+
+    def selection_changed(self, graphics_node, state):
+        if state == 0:
+            self.clean_selection_effect()
+        else:
+            self.current_graphics_node = graphics_node
+            self.show_selection_effect()
+
+    @staticmethod
+    def enlarge_rect(rect):
+        offsetx = 2
+        offsety = 2
+        c = rect.center()
+        r = QPointF(rect.width() / 2 + offsetx, rect.height() / 2 + offsety)
+        return QRectF(c - r, c + r)
+
+    def show_selection_effect(self):
+        selection_pen = QPen()
+        selection_pen.setWidth(5)
+        rect = self.current_graphics_node.boundingRect()
+        self.selection_graphics = self.scene.addRect(self.enlarge_rect(rect), selection_pen)
+        self.selection_graphics.setPos(self.current_graphics_node.pos())
+        self.selection_graphics.setZValue(0.5)
+
+    def clean_selection_effect(self):
+        self.scene.removeItem(self.selection_graphics)
+        self.selection_graphics = None

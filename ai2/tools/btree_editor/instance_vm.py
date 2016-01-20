@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QGraphicsView, QMessageBox, QGraphicsScene
 from PyQt5.QtCore import Qt, QRectF, QPointF, QLineF
 
 from ai2.tools.btree_editor.tree_edit_view import \
-    NodeEditorView, BasicNode, TreeNodeLayouter
+    NodeEditorView, NodeEditorVM
 from ai2.tools.btree_editor.btree_config import config, UNIT
 
 AREA_WIDTH = 1920 * 2.0
@@ -32,13 +32,14 @@ class BTreeInstanceVM(object):
         self.sub_window.show()
         parent.instances.append(self)
 
-        self.refresh()
+        self.vm.refresh()
 
     def init_view(self):
         self.btree_scene = QGraphicsScene()
         self.btree_view = NodeEditorView(self.btree_scene)
         self.btree_view.setAttribute(Qt.WA_DeleteOnClose)
         self.btree_scene.setSceneRect(AREA)
+        self.vm = NodeEditorVM(self.model, self.btree_view, self.btree_scene)
 
     def set_dirty(self):
         self.set_modified(True)
@@ -59,66 +60,3 @@ class BTreeInstanceVM(object):
             QMessageBox.Yes | QMessageBox.No)
         if ret == QMessageBox.No:
             ev.ignore()
-
-    def cleanup(self):
-        self.btree_scene.clear()
-
-    def display_tree_model(self, model):
-        root = self.build_tree(model.root)
-        layouter = TreeNodeLayouter(root)
-        layouter.run()
-        self.display_links_rec(root)
-
-    def display_links_rec(self, cur):
-        spos = cur.right_pos()
-        for c in cur.children:
-            dpos = c.left_pos()
-            l = self.btree_scene.addLine(QLineF(spos, dpos))
-            l.setZValue(1.0)
-            self.display_links_rec(c)
-
-    def build_tree(self, node):
-        chs = []
-        for c in node.children:
-            t = self.build_tree(c)
-            chs.append(t)
-        n = self.build_node_from_model(node)
-        n.children = chs
-        return n
-
-    def build_node_from_model(self, model):
-        n = BasicNode(model, self)
-        self.btree_scene.addItem(n)
-        return n
-
-    def refresh(self):
-        self.cleanup()
-        self.display_tree_model(self.model)
-
-    def selection_changed(self, graph_node, state):
-        if state == 0:
-            self.clean_selection_effect()
-        else:
-            self.current_graphics_node = graph_node
-            self.show_selection_effect()
-
-    @staticmethod
-    def enlarge_rect(rect):
-        offsetx = 2
-        offsety = 2
-        c = rect.center()
-        r = QPointF(rect.width() / 2 + offsetx, rect.height() / 2 + offsety)
-        return QRectF(c - r, c + r)
-
-
-    def show_selection_effect(self):
-        selection_pen = QPen()
-        selection_pen.setWidth(5)
-        rect = self.current_graphics_node.boundingRect()
-        self.selection_graphics = self.btree_scene.addRect(self.enlarge_rect(rect), selection_pen)
-        self.selection_graphics.setPos(self.current_graphics_node.pos())
-        self.selection_graphics.setZValue(0.5)
-
-    def clean_selection_effect(self):
-        self.btree_scene.removeItem(self.selection_graphics)
-        self.selection_graphics = None
