@@ -27,6 +27,7 @@ STATE_DIALOG_HEADERS = ("state name", "uid")
 LIST_DIALOG_COLUMNS = ("name", "uid")
 FSM_FILE_EXT = ".fsm"
 
+
 class EditorMainWindow(object):
     def __init__(self):
         self.seq = 0

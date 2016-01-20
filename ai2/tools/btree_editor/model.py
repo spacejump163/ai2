@@ -4,6 +4,7 @@ import pickle
 import pprint
 
 import ai2.runtime.defs as defs
+from ai2.tools.btree_editor.btree_config import config
 from ai2.tools.common_types import ParamItem
 
 
@@ -25,8 +26,11 @@ class NodeModel(object):
     def get_name(self):
         return self.category + str(self.uid)
 
+    def get_display_text(self):
+        return self.get_name()
+
     def get_name_symbol(self):
-        return SymbolName(self.category + str(self.uid))
+        return SymbolName(self.get_name())
 
     def children_to_tuple(self):
         name_list = [c.get_name_symbol() for c in self.children]
@@ -117,6 +121,9 @@ class ActionModel(NodeModel):
         enter_args = tuple([self.enter_action_name] + self.enter_action_args)
         leave_args = tuple([self.leave_action_name] + self.leave_action_args)
         return tuple([enter_args, leave_args])
+
+    def get_display_text(self):
+        return "%s%s" % (self.enter_action_name, repr(tuple(self.enter_action_args)))
 
 
 class SymbolName(object):
@@ -269,14 +276,37 @@ class BTreeModelPythonExporter(object):
         frags.append(frag)
 
 
-def run():
+def build_test_tree_model():
+    """
+    root---seq0---seq1---a0
+               |--seq2---a1
+               |      |--a2
+               |      |--a3
+               |--seq3---a4
+               |      |--a5
+               |--a6
+    """
     model = BTreeModel()
     seq0 = model.add_node(model.root, SequenceModel, 0)
-    model.add_node(seq0, ComputeModel, 0)
-    model.add_node(seq0, ComputeModel, 1)
-    model.add_node(seq0, ComputeModel, 2)
-    seq1 = model.add_node(seq0, SequenceModel, 3)
-    model.add_node(seq1, ActionModel, 0)
-    model.add_node(seq1, ActionModel, 1)
+    seq1 = model.add_node(seq0, SequenceModel, 0)
+    a0 = model.add_node(seq1, ActionModel, 0)
+    a0.enter_action_name = "aaaaaaaaaaaaaaaaa0"
+    seq2 = model.add_node(seq0, SequenceModel, 1)
+    a1 = model.add_node(seq2, ComputeModel, 0)
+    a2 = model.add_node(seq2, ComputeModel, 1)
+    a3 = model.add_node(seq2, ComputeModel, 2)
+    seq3 = model.add_node(seq0, SequenceModel, 3)
+    a4 = model.add_node(seq3, ActionModel, 0)
+    a5 = model.add_node(seq3, ActionModel, 1)
+    a4.enter_action_name = "aa4"
+    a5.enter_action_name = "aaa5"
+    a6 = model.add_node(seq0, ActionModel, 9)
+    a6.enter_action_name = "aaaaaaaaaaaaa6"
+    return model
+
+
+def run():
+    model = build_test_tree_model()
+    model.dump_file(config.src_path + "\\abc_btree.py")
     exporter = BTreeModelPythonExporter(model)
     exporter.export("btree_export.py")
