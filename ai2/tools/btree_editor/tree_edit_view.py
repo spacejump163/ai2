@@ -154,6 +154,7 @@ class BasicNode(QGraphicsItemGroup):
         text = model.get_display_text()
         self.manager = manager
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+        self.setFlag(QGraphicsItem.ItemIsFocusable, True)
 
         self.text_graph = QGraphicsSimpleTextItem(text)
         self.text_graph.setBrush(text_color)
@@ -207,6 +208,8 @@ class BasicNode(QGraphicsItemGroup):
     def right_pos(self):
         return self.pos() + QPointF(self.get_width() / 2.0, 0)
 
+    def contextMenuEvent(self, ev, *args, **kwargs):
+        print("context menu event for %s" % (self))
 
 class TreeNodeLayouter(object):
     def __init__(self, root):
