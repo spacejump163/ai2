@@ -25,9 +25,7 @@ class InstanceVM(object):
         self.sub_window = parent.mdi.addSubWindow(self.table_view)
         self.sub_window.instance = self
         self.sub_window.setAttribute(Qt.WA_DeleteOnClose)
-        self.table_view.setAttribute(Qt.WA_DeleteOnClose)
         self.update_title()
-        self.sub_window.closeEvent = self.close_handler
         parent.instances.append(self)
 
     def set_dirty(self):
@@ -41,14 +39,15 @@ class InstanceVM(object):
         self.sub_window.setWindowTitle(self.file_path + "[*]")
 
     def close_handler(self, ev):
-        if not self.modified:
-            return
-        ret = QMessageBox().question(
-            self.table_view, "Confirm",
-            "close without saving?",
-            QMessageBox.Yes | QMessageBox.No)
-        if ret == QMessageBox.No:
-            ev.ignore()
+        if self.modified:
+            ret = QMessageBox().question(
+                self.table_view, "Confirm",
+                "close without saving?",
+                QMessageBox.Yes | QMessageBox.No)
+            if ret == QMessageBox.No:
+                ev.ignore()
+                return
+        self.parent.remove_instance(self)
 
 
 class InstanceTableModel(QAbstractTableModel):

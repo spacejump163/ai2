@@ -5,15 +5,44 @@ import pprint
 
 import ai2.runtime.defs as defs
 from ai2.tools.btree_editor.btree_config import config
-from ai2.tools.common_types import ParamItem
+from ai2.tools.editable_objects import \
+    StringValue, IntValue, FloatValue, BoolValue,\
+    EnumeratorValue, \
+    ListValue, StructValue
+
+class ColorProvider(object):
+    choices = (
+        "red",
+        "green",
+        "yellow",
+        "purple",
+        "grey",
+        "white",
+    )
+    values = choices
 
 
 class NodeModel(object):
-    category = None
+    category = "invalid_category"
+    type_display_name = category
+
     def __init__(self):
         self.uid = 0
         self.children = []
-        self.debug_info = ""
+        self.parent = None
+        self.editable_info = self.build_editable_info()
+
+    def build_editable_info(self):
+        comment = StringValue()
+        comment.set_name("comment")
+        color = EnumeratorValue(ColorProvider, ColorProvider.choices[0])
+        color.set_name("color")
+        s = StructValue(comment, color)
+        return s
+
+    @property
+    def debug_info(self):
+        return ""
 
     def to_tuple(self):
         data = self.data_to_tuple()
@@ -27,7 +56,7 @@ class NodeModel(object):
         return self.category + str(self.uid)
 
     def get_display_text(self):
-        return self.get_name()
+        return self.type_display_name + str(self.uid)
 
     def get_name_symbol(self):
         return SymbolName(self.get_name())
@@ -40,30 +69,38 @@ class NodeModel(object):
         if idx is None:
             idx = len(self.children)
         self.children.insert(idx, node)
+        node.parent = self
 
 
 class RootModel(NodeModel):
     category = defs.NT_ROOT
+    type_display_name = "Root"
 
 
 class SequenceModel(NodeModel):
     category = defs.NT_SEQ
+    type_display_name = "Sequence"
 
-
-class RandomSequence(NodeModel):
+class RandomSequenceModel(NodeModel):
     category = defs.NT_RSEQ
+    type_display_name = "RandomSequence"
 
 
 class SelectModel(NodeModel):
     category = defs.NT_SEL
+    type_display_name = "Select"
 
 
 class ProbabilityModel(NodeModel):
     category = defs.NT_PSEL
+    type_display_name = "Probability"
 
-    def __init__(self):
-        super(ProbabilityModel, self).__init__()
-        self.weights = []
+    def build_editable_info(self):
+        s = super(ProbabilityModel, self).build_editable_info()
+        l = ListValue(FloatValue())
+        l.set_name = "weights"
+        s._add(l)
+        return s
 
     def data_to_tuple(self):
         return tuple(self.weights)
@@ -71,51 +108,116 @@ class ProbabilityModel(NodeModel):
 
 class IfElseModel(NodeModel):
     category = defs.NT_IF
+    type_display_name = "IfElse"
 
 
 class ParallelModel(NodeModel):
     category = defs.NT_PARL
+    type_display_name = "Parallel"
 
 
 class UntilModel(NodeModel):
     category = defs.NT_UNTIL
-
+    type_display_name = "Until"
 
 class NotModel(NodeModel):
     category = defs.NT_NOT
+    type_display_name = "Not"
 
 
 class AlwaysModel(NodeModel):
     category = defs.NT_ALWAYS
+    type_display_name = "Always"
 
     def __init__(self):
         super(AlwaysModel, self).__init__()
-        self.value = True
+
+    def build_editable_info(self):
+        s = super(AlwaysModel, self).build_editable_info()
+        b = BoolValue()
+        b.set_name("boolean")
+        s._add(b)
+        return s
 
     def data_to_tuple(self):
-        return self.value
+        return self.editable_info.boolean
 
 
 class CallModel(NodeModel):
     category = defs.NT_CALL
+    type_display_name = "Call"
 
     def __init__(self):
         super(CallModel, self).__init__()
-        self.tree_name = ""
+        tree_name = StringValue()
+        tree_name.set_name("tree_name")
+        self.editable_info._add(tree_name)
+
+    def build_editable_info(self):
+        s = super(CallModel, self).build_editable_info()
+        tree_name = StringValue()
+        tree_name.set_name("tree_name")
+        s._add(tree_name)
+        return s
 
     def data_to_tuple(self):
-        return self.tree_name
+        return self.editable_info.tree_name
+
+
+class MethodNameProvider(object):
+    choices = (
+        "func0",
+        "func1",
+        "func2",
+        "func3",
+    )
+    values = choices
+
+
+class ParamTypeProvider(object):
+    choices = (
+        defs.PAR_CONST,
+        defs.PAR_BB,
+        defs.PAR_PROP,
+    )
+    values = choices
 
 
 class ActionModel(NodeModel):
     category = defs.NT_ACT
+    type_display_name = "Action"
 
-    def __init__(self):
-        super(ActionModel, self).__init__()
-        self.enter_action_name = ""
-        self.enter_action_args = []
-        self.leave_action_name = ""
-        self.leave_action_args = []
+    def build_param_type(self):
+        # param_struct
+        e = EnumeratorValue(ParamTypeProvider, None)
+        e.name = "param_type"
+        v = StringValue()
+        v.name = "value"
+        param_struct = StructValue(e, v)
+
+    def build_action_arg_struct(self, *names):
+        """"
+        this method is useless since it's only for initialization not changing
+        """
+        st = StructValue()
+        # name selector
+        act_name = EnumeratorValue(MethodNameProvider, None)
+        act_name.set_name("act_name")
+        st._add(st)
+        for n in names:
+            field = self.build_param_type()
+            field.set_name(n)
+            st._add(field)
+        return st
+
+    def build_editable_info(self):
+        st = super(ActionModel, self).build_editable_info()
+        enter = self.build_action_arg_struct()
+        enter.set_name("enter")
+        leave = self.build_action_arg_struct()
+        leave.set_name("leave")
+        st._add(enter, leave)
+        return st
 
     def data_to_tuple(self):
         enter_args = tuple([self.enter_action_name] + self.enter_action_args)
@@ -145,14 +247,44 @@ class CodeFragment(object):
         return body
 
 
-class ComputeModel(NodeModel):
+class ConditionModel(NodeModel):
     category = defs.NT_COMP
+    type_display_name = "Condition"
 
-    def __init__(self):
-        super(ComputeModel, self).__init__()
-        self.oargs = []
-        self.code = ""
-        self.iargs = []
+    def build_code_arg(self):
+        e = EnumeratorValue(ParamTypeProvider, None)
+        e.set_name("param_type")
+        n0 = StringValue()
+        n0.set_name("var_name")
+        n1 = StringValue()
+        n1.set_name("expr_name")
+        s = StructValue(e, n0, n1)
+        l = ListValue(s)
+        l.name = "iargs"
+        return l
+
+    def build_editable_info(self):
+        st = super(ConditionModel, self).build_editable_info()
+        iargs = self.build_code_arg()
+        fragment = StringValue()
+        fragment.set_name("expr")
+        st._add(fragment, iargs)
+        return st
+
+    def data_to_tuple(self):
+        iargs = tuple([a.to_tuple() for a in self.iargs])
+        return self.code, iargs
+
+class ComputeModel(ConditionModel):
+    category = defs.NT_COMP
+    type_display_name = "Compute"
+
+    def build_editable_info(self):
+        st = super(ComputeModel, self).build_editable_info()
+        oargs = self.build_code_arg()
+        oargs.set_name("oargs")
+        st._add(oargs)
+        return st
 
     def data_to_tuple(self):
         oargs = tuple([a.to_tuple() for a in self.oargs])
@@ -160,25 +292,16 @@ class ComputeModel(NodeModel):
         return oargs, CodeFragment(self.code), iargs
 
 
-class Condition(NodeModel):
-    category = defs.NT_COMP
-
-    def __init__(self):
-        super(Condition, self).__init__()
-        self.code = ""
-        self.iargs = []
-
-    def data_to_tuple(self):
-        iargs = tuple([a.to_tuple() for a in self.iargs])
-        return self.code, iargs
-
-
-class WaitFor(NodeModel):
+class WaitForModel(NodeModel):
     category = defs.NT_WAIT
+    type_display_name = "WaitFor"
 
-    def __init__(self):
-        super(WaitFor, self).__init__()
-        self.event_name = ""
+    def build_editable_info(self):
+        st = super(WaitForModel).build_editable_info()
+        event_name = StringValue()
+        event_name.set_name("event_name")
+        st._add(event_name)
+        return st
 
     def data_to_tuple(self):
         return self.event_name
@@ -194,12 +317,33 @@ class BTreeModel(object):
         self.uid_cnt += 1
         return self.uid_cnt
 
-    def add_node(self, parent, clz, idx):
+    def add_node(self, parent, stuff, idx):
+        if isinstance(stuff, NodeModel):
+            return self.add_node_subtree(parent, stuff, idx)
+        else:
+            return self.add_node_clz(parent, stuff, idx)
+
+    def add_node_clz(self, parent, clz, idx):
         uid = self.get_uid()
         node = clz()
         node.uid = uid
         parent.add_child(node, idx)
         return node
+
+    def add_node_subtree(self, parent, subtree, idx):
+        self.reuid_walker(subtree)
+        parent.add_child(subtree, idx)
+
+    def reuid_walker(self, root):
+        root.uid = self.get_uid()
+        for c in root.children:
+            self.reuid_walker(c)
+
+
+    def cut_tree(self, node):
+        parent = node.parent
+        parent.children.remove(node)
+        node.parent = None
 
     def get_node(self, uid):
         return self.get_node_recursive(self.root, uid)
@@ -303,6 +447,26 @@ def build_test_tree_model():
     a6 = model.add_node(seq0, ActionModel, 9)
     a6.enter_action_name = "aaaaaaaaaaaaa6"
     return model
+
+
+def get_all_node_class():
+    classes = [
+        SequenceModel,
+        RandomSequenceModel,
+        SelectModel,
+        ProbabilityModel,
+        IfElseModel,
+        ParallelModel,
+        UntilModel,
+        NotModel,
+        AlwaysModel,
+        CallModel,
+        ActionModel,
+        ComputeModel,
+        ConditionModel,
+        WaitForModel,
+    ]
+    return classes
 
 
 def run():

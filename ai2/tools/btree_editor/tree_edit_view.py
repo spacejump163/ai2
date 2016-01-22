@@ -1,5 +1,7 @@
 # -*- encoding: utf-8 -*-
 import sys
+import os
+import copy
 
 from PyQt5.QtWidgets import \
     QApplication, QMainWindow, QGraphicsScene, \
@@ -7,99 +9,16 @@ from PyQt5.QtWidgets import \
     QGraphicsItemGroup, QGraphicsSimpleTextItem
 from PyQt5.QtCore import QRectF, Qt, QPointF, QTimer, QPoint, QLineF
 from PyQt5.QtGui import QPainterPath, QTransform, QColor, QBrush, QPainter, QPen
+from PyQt5.uic import loadUi
 
 import ai2.tools.btree_editor.model as model
 
+this_path = os.path.dirname(__file__)
+NODE_SELECTION_UI_PATH = os.path.join(
+    this_path,
+    "../../../res/gui/node_select_dialog.ui")
+
 UNIT = 10
-
-"""
-class TestWindow(QMainWindow):
-    def __init__(self):
-        super(TestWindow, self).__init__()
-        self.init_graphics()
-        self.init_debug_traits()
-        self.init_elements_save()
-
-    def init_graphics(self):
-        self.scene = QGraphicsScene()
-        self.view = NodeEditorView(self.scene)
-        self.view.update_handler = self.update_handler
-        self.scene.setSceneRect(QRectF(-UNIT * 100, -UNIT * 100, UNIT * 200, UNIT * 200))
-        self.setCentralWidget(self.view)
-
-    def update_handler(self):
-        m = model.build_test_tree_model()
-        self.cleanup()
-        self.init_debug_traits()
-        self.display_tree_model(m)
-
-    def display_tree_model(self, model):
-        root = self.build_tree(model.root)
-        layouter = TreeNodeLayouter(root)
-        layouter.run()
-        self.display_links_rec(root)
-
-    def display_links_rec(self, cur):
-        spos = cur.right_pos()
-        for c in cur.children:
-            dpos = c.left_pos()
-            self.scene.addLine(QLineF(spos, dpos))
-            self.display_links_rec(c)
-
-    def build_tree(self, node):
-        chs = []
-        for c in node.children:
-            t = self.build_tree(c)
-            chs.append(t)
-        n = self.build_node_from_model(node)
-        n.children = chs
-        return n
-
-    def build_node_from_model(self, model):
-        name = model.get_display_text()
-        #name = model.get_name()
-        n = BasicNode(name, model)
-        self.scene.addItem(n)
-        return n
-
-    def init_debug_traits(self):
-        center = self.scene.addRect(QRectF(-20, -20, 40, 40))
-
-    def cleanup(self):
-        self.scene.clear()
-
-    def init_elements_save(self):
-        center = self.scene.addRect(QRectF(-20, -20, 40, 40))
-
-        n0 = BasicNode("n0")
-        n0.setPos(0, 0)
-        self.scene.addItem(n0)
-
-        n00 = BasicNode("n00")
-        n00.setPos(100, 100)
-        self.scene.addItem(n00)
-
-        n01 = BasicNode("n01")
-        n01.setPos(100, 0)
-        self.scene.addItem(n01)
-
-        n000 = BasicNode("n000")
-        n000.setPos(200, 200)
-        self.scene.addItem(n000)
-
-        n001 = BasicNode("n001")
-        n001.setPos(200, 100)
-        self.scene.addItem(n001)
-
-        n010 = BasicNode("n010")
-        n010.setPos(200, 0)
-        self.scene.addItem(n010)
-
-        self.view.centerOn(center)
-
-    def closeEvent(self, *args, **kwargs):
-        sys.exit(0)
-"""
 
 class NodeEditorView(QGraphicsView):
     def __init__(self, *args):
@@ -184,7 +103,7 @@ class BasicNode(QGraphicsItemGroup):
     def get_width(self):
         return self.boundingRect().width()
 
-    def setPosLeft(self, pos):
+    def set_left_pos(self, pos):
         pos += QPoint(self.get_width() / 2.0, 0)
         self.setPos(pos)
 
@@ -197,8 +116,10 @@ class BasicNode(QGraphicsItemGroup):
     def right_pos(self):
         return self.pos() + QPointF(self.get_width() / 2.0, 0)
 
+    """
     def contextMenuEvent(self, ev, *args, **kwargs):
         print("context menu event for %s" % (self))
+    """
 
 
 class TreeNodeLayouter(object):
@@ -249,14 +170,14 @@ class TreeNodeLayouter(object):
         self.funcy = fy
 
     def build_pos_funcx(self):
-        f = lambda x: sum(self.widths[:x]) #+ x * 4 * UNIT
+        f = lambda x: sum(self.widths[:x]) + x * 4 * UNIT
         self.funcx = f
 
     def layout_node_rec(self, node):
         x = self.funcx(node.layout_x)
         y = self.funcy(node.layout_y)
         p = QPointF(x, y)
-        node.setPosLeft(p)
+        node.set_left_pos(p)
 
         for c in node.children:
             self.layout_node_rec(c)
@@ -267,12 +188,20 @@ class NodeEditorVM(object):
         self.view = view
         self.scene = scene
         self.model = model
+        self.selected_node = None
+        self.selected_effect = None
+        self.graphics_root = None
 
+        self.cut_tree = None
+
+    ###########################################################################
+    # display refresh related
+    ###########################################################################
     def clear(self):
         self.scene.clear()
 
     def display_tree_model(self):
-        root = self.build_tree(self.model.root)
+        self.graphics_root = root = self.build_tree(self.model.root)
         layouter = TreeNodeLayouter(root)
         layouter.run()
         self.display_links_rec(root)
@@ -299,15 +228,29 @@ class NodeEditorVM(object):
         self.scene.addItem(n)
         return n
 
+    def find_graphics_for_node(self, model):
+        return self.search_func(self.graphics_root, model)
+
+    def search_func(self, root, model):
+        if root.model is model:
+            return root
+        for c in root.children:
+            r = self.search_func(c, model)
+            if r:
+                return r
+        return None
+
     def refresh(self):
         self.clear()
         self.display_tree_model()
+        self.set_selection()
 
     def selection_changed(self, graphics_node, state):
         if state == 0:
+            self.selected_node = None
             self.clean_selection_effect()
         else:
-            self.current_graphics_node = graphics_node
+            self.selected_node = graphics_node.model
             self.show_selection_effect()
 
     @staticmethod
@@ -319,13 +262,102 @@ class NodeEditorVM(object):
         return QRectF(c - r, c + r)
 
     def show_selection_effect(self):
+        if self.selected_node is None:
+            return
         selection_pen = QPen()
         selection_pen.setWidth(5)
-        rect = self.current_graphics_node.boundingRect()
-        self.selection_graphics = self.scene.addRect(self.enlarge_rect(rect), selection_pen)
-        self.selection_graphics.setPos(self.current_graphics_node.pos())
-        self.selection_graphics.setZValue(0.5)
+        cnode = self.find_graphics_for_node(self.selected_node)
+        rect = cnode.boundingRect()
+        self.selected_effect = self.scene.addRect(self.enlarge_rect(rect), selection_pen)
+        self.selected_effect.setPos(cnode.pos())
+        self.selected_effect.setZValue(0.5)
 
     def clean_selection_effect(self):
-        self.scene.removeItem(self.selection_graphics)
-        self.selection_graphics = None
+        self.scene.removeItem(self.selected_effect)
+        self.selected_effect = None
+
+    def set_selection(self):
+        if self.selected_node is None:
+            return
+        g = self.find_graphics_for_node(self.selected_node)
+        g.setSelected(True)
+
+    ###########################################################################
+    # editing related
+    ###########################################################################
+
+    def insert_handler(self):
+        if self.selected_node is None:
+            return
+        dialog = NodeSelectDialog()
+        clz = dialog.run()
+        if clz is None:
+            return
+        self.model.add_node(self.selected_node, clz, None)
+        self.refresh()
+
+    def delete_handler(self):
+        if self.selected_node is None:
+            return
+        if self.selected_node.parent == None:
+            return
+        self.model.cut_tree(self.selected_node)
+        self.selected_node = None
+        self.refresh()
+
+    def copy_handler(self):
+        if self.selected_node is None:
+            return
+        self.cut_tree = self.copy_subtree(self.selected_node)
+
+    def paste_handler(self):
+        if self.selected_node is None:
+            return
+        if self.cut_tree is None:
+            return
+        new_copy = self.copy_subtree(self.cut_tree)
+        self.model.add_node(self.selected_node, new_copy, None)
+        self.refresh()
+
+    def cut_handler(self):
+        if self.selected_node is None:
+            return
+        if self.selected_node.parent == None:
+            return
+        self.model.cut_tree(self.selected_node)
+        self.cut_tree = self.selected_node
+        self.selected_node = None
+        self.refresh()
+
+
+    @staticmethod
+    def copy_subtree(node):
+        saved_parent = node.parent
+        node.parent = None
+        copied = copy.deepcopy(node)
+        node.parent = saved_parent
+        return copied
+
+
+class NodeSelectDialog(object):
+    def __init__(self):
+        classes = self.classes = model.get_all_node_class()
+        dialog = loadUi(NODE_SELECTION_UI_PATH)
+        self.valid = False
+        self.window = dialog
+        self.window.list.itemDoubleClicked.connect(self.close_handler)
+        for c in classes:
+            text = c.type_display_name
+            self.window.list.addItem(text)
+
+    def run(self):
+        self.window.exec()
+        r = self.window.list.currentRow()
+        if self.valid:
+            return self.classes[r]
+        else:
+            return None
+
+    def close_handler(self, *args):
+        self.valid = True
+        self.window.close()

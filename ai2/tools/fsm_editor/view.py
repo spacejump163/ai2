@@ -74,6 +74,9 @@ class EditorMainWindow(object):
     def init_instance(self):
         self.instances = []
 
+    def remove_instance(self, ins):
+        self.instances.remove(ins)
+
     def find_non_existing_name(self):
         while True:
             tmp_path = os.path.join(
