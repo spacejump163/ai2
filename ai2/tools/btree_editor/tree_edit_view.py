@@ -20,6 +20,7 @@ NODE_SELECTION_UI_PATH = os.path.join(
 
 UNIT = 10
 
+
 class NodeEditorView(QGraphicsView):
     def __init__(self, *args):
         super(NodeEditorView, self).__init__(*args)
@@ -192,8 +193,6 @@ class NodeEditorVM(object):
         self.selected_effect = None
         self.graphics_root = None
 
-        self.cut_tree = None
-
     ###########################################################################
     # display refresh related
     ###########################################################################
@@ -308,14 +307,15 @@ class NodeEditorVM(object):
     def copy_handler(self):
         if self.selected_node is None:
             return
-        self.cut_tree = self.copy_subtree(self.selected_node)
+        t = self.copy_subtree(self.selected_node)
+        return t
 
-    def paste_handler(self):
+    def paste_handler(self, fragment):
         if self.selected_node is None:
             return
-        if self.cut_tree is None:
+        if fragment is None:
             return
-        new_copy = self.copy_subtree(self.cut_tree)
+        new_copy = self.copy_subtree(fragment)
         self.model.add_node(self.selected_node, new_copy, None)
         self.refresh()
 
@@ -325,9 +325,10 @@ class NodeEditorVM(object):
         if self.selected_node.parent == None:
             return
         self.model.cut_tree(self.selected_node)
-        self.cut_tree = self.selected_node
+        fragment = self.selected_node
         self.selected_node = None
         self.refresh()
+        return fragment
 
 
     @staticmethod

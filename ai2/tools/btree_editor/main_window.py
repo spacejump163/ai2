@@ -4,6 +4,7 @@ import sys
 import os
 
 from PyQt5.QtWidgets import QApplication, QFileDialog, QTabWidget, QMdiArea
+from PyQt5.QtCore import Qt
 from PyQt5.uic import loadUi
 
 from ai2.tools.btree_editor.btree_config import config
@@ -25,6 +26,7 @@ class BTreeEditorMainWindow(object):
         self.init_instance()
         self.init_widgets()
         self.init_actions()
+        self.init_common_logic()
         self.window.closeEvent = self.close_handler
         self.window.showMaximized()
 
@@ -36,7 +38,8 @@ class BTreeEditorMainWindow(object):
         self.mdi.setTabsMovable(True)
         self.mdi.setTabsClosable(True)
         self.mdi.setTabShape(QTabWidget.Rounded)
-        self.dock = self.window.dockWidget
+        self.dock_anchor = self.window.dockAnchor
+        self.dock_anchor.layout().setAlignment(Qt.AlignTop)
 
     def init_actions(self):
         self.window.actionNew.triggered.connect(self.action_new_handler)
@@ -53,6 +56,9 @@ class BTreeEditorMainWindow(object):
         self.window.actionCopy.triggered.connect(self.action_copy_handler)
         self.window.actionPaste.triggered.connect(self.action_paste_handler)
         self.window.actionCut.triggered.connect(self.action_cut_handler)
+
+    def init_common_logic(self):
+        self.tree_fragment = None
 
     def close_handler(self, ev):
         l = self.mdi.subWindowList()
@@ -170,20 +176,19 @@ class BTreeEditorMainWindow(object):
         w = self.mdi.activeSubWindow()
         if w is None:
             return
-        w.instance.vm.copy_handler()
+        self.tree_fragment =  w.instance.vm.copy_handler()
 
     def action_paste_handler(self):
         w = self.mdi.activeSubWindow()
         if w is None:
             return
-        w.instance.vm.paste_handler()
+        w.instance.vm.paste_handler(self.tree_fragment)
 
     def action_cut_handler(self):
         w = self.mdi.activeSubWindow()
         if w is None:
             return
-        w.instance.vm.cut_handler()
-
+        self.tree_fragment = w.instance.vm.cut_handler()
 
 
 def run():

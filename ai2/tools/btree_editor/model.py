@@ -10,6 +10,7 @@ from ai2.tools.editable_objects import \
     EnumeratorValue, \
     ListValue, StructValue
 
+
 class ColorProvider(object):
     choices = (
         "red",
@@ -97,13 +98,13 @@ class ProbabilityModel(NodeModel):
 
     def build_editable_info(self):
         s = super(ProbabilityModel, self).build_editable_info()
-        l = ListValue(FloatValue())
-        l.set_name = "weights"
-        s._add(l)
+        lst = ListValue(FloatValue())
+        lst.set_name = "weights"
+        s += lst
         return s
 
     def data_to_tuple(self):
-        return tuple(self.weights)
+        return tuple(self.editable_info.weights)
 
 
 class IfElseModel(NodeModel):
@@ -136,7 +137,7 @@ class AlwaysModel(NodeModel):
         s = super(AlwaysModel, self).build_editable_info()
         b = BoolValue()
         b.set_name("boolean")
-        s._add(b)
+        s += b
         return s
 
     def data_to_tuple(self):
@@ -147,17 +148,11 @@ class CallModel(NodeModel):
     category = defs.NT_CALL
     type_display_name = "Call"
 
-    def __init__(self):
-        super(CallModel, self).__init__()
-        tree_name = StringValue()
-        tree_name.set_name("tree_name")
-        self.editable_info._add(tree_name)
-
     def build_editable_info(self):
         s = super(CallModel, self).build_editable_info()
         tree_name = StringValue()
         tree_name.set_name("tree_name")
-        s._add(tree_name)
+        s += tree_name
         return s
 
     def data_to_tuple(self):
@@ -197,17 +192,17 @@ class ActionModel(NodeModel):
 
     def build_action_arg_struct(self, *names):
         """"
-        this method is useless since it's only for initialization not changing
+        this method is useless since it's only for initialization
         """
         st = StructValue()
         # name selector
         act_name = EnumeratorValue(MethodNameProvider, None)
         act_name.set_name("act_name")
-        st._add(st)
+        st += act_name
         for n in names:
             field = self.build_param_type()
             field.set_name(n)
-            st._add(field)
+            st += field
         return st
 
     def build_editable_info(self):
@@ -216,16 +211,19 @@ class ActionModel(NodeModel):
         enter.set_name("enter")
         leave = self.build_action_arg_struct()
         leave.set_name("leave")
-        st._add(enter, leave)
+        st += (enter, leave)
         return st
 
     def data_to_tuple(self):
-        enter_args = tuple([self.enter_action_name] + self.enter_action_args)
-        leave_args = tuple([self.leave_action_name] + self.leave_action_args)
-        return tuple([enter_args, leave_args])
+        info = self.editable_info
+        return tuple([info.enter, info.leave])
 
     def get_display_text(self):
-        return "%s%s" % (self.enter_action_name, repr(tuple(self.enter_action_args)))
+        itr = self.editable_info.enter.__iter__()
+        func_name = itr.__next__().get_name()
+        args = [repr(i) for i in itr]
+        arg_str = ", ".join(map(lambda x: repr(x), args))
+        return "%s(%s)" % (func_name, arg_str)
 
 
 class SymbolName(object):
@@ -260,20 +258,20 @@ class ConditionModel(NodeModel):
         n1.set_name("expr_name")
         s = StructValue(e, n0, n1)
         l = ListValue(s)
-        l.name = "iargs"
         return l
 
     def build_editable_info(self):
         st = super(ConditionModel, self).build_editable_info()
         iargs = self.build_code_arg()
+        iargs.set_name("iargs")
         fragment = StringValue()
         fragment.set_name("expr")
-        st._add(fragment, iargs)
+        st += (fragment, iargs)
         return st
 
     def data_to_tuple(self):
-        iargs = tuple([a.to_tuple() for a in self.iargs])
-        return self.code, iargs
+        info = self.editable_info
+        return info.expr, info.iargs
 
 class ComputeModel(ConditionModel):
     category = defs.NT_COMP
@@ -283,13 +281,12 @@ class ComputeModel(ConditionModel):
         st = super(ComputeModel, self).build_editable_info()
         oargs = self.build_code_arg()
         oargs.set_name("oargs")
-        st._add(oargs)
+        st += oargs
         return st
 
     def data_to_tuple(self):
-        oargs = tuple([a.to_tuple() for a in self.oargs])
-        iargs = tuple([a.to_tuple() for a in self.iargs])
-        return oargs, CodeFragment(self.code), iargs
+        info = self.editable_info
+        return info.expr, info.iargs, info.oargs
 
 
 class WaitForModel(NodeModel):
@@ -298,13 +295,13 @@ class WaitForModel(NodeModel):
 
     def build_editable_info(self):
         st = super(WaitForModel).build_editable_info()
-        event_name = StringValue()
-        event_name.set_name("event_name")
-        st._add(event_name)
+        event = StringValue()
+        event.set_name("event")
+        st += event
         return st
 
     def data_to_tuple(self):
-        return self.event_name
+        return self.editable_info.event
 
 
 class BTreeModel(object):
@@ -420,7 +417,7 @@ class BTreeModelPythonExporter(object):
         frags.append(frag)
 
 
-def build_test_tree_model():
+def build_test_tree_model0():
     """
     root---seq0---seq1---a0
                |--seq2---a1
@@ -434,7 +431,6 @@ def build_test_tree_model():
     seq0 = model.add_node(model.root, SequenceModel, 0)
     seq1 = model.add_node(seq0, SequenceModel, 0)
     a0 = model.add_node(seq1, ActionModel, 0)
-    a0.enter_action_name = "aaaaaaaaaaaaaaaaa0"
     seq2 = model.add_node(seq0, SequenceModel, 1)
     a1 = model.add_node(seq2, ComputeModel, 0)
     a2 = model.add_node(seq2, ComputeModel, 1)
@@ -442,12 +438,15 @@ def build_test_tree_model():
     seq3 = model.add_node(seq0, SequenceModel, 3)
     a4 = model.add_node(seq3, ActionModel, 0)
     a5 = model.add_node(seq3, ActionModel, 1)
-    a4.enter_action_name = "aa4"
-    a5.enter_action_name = "aaa5"
     a6 = model.add_node(seq0, ActionModel, 9)
-    a6.enter_action_name = "aaaaaaaaaaaaa6"
     return model
 
+def build_test_tree_model1():
+    model = BTreeModel()
+    seq0 = model.add_node(model.root, SequenceModel, 0)
+    seq1 = model.add_node(seq0, SequenceModel, 0)
+    a0 = model.add_node(seq1, ActionModel, 0)
+    return model
 
 def get_all_node_class():
     classes = [
@@ -470,7 +469,7 @@ def get_all_node_class():
 
 
 def run():
-    model = build_test_tree_model()
-    model.dump_file(config.src_path + "\\abc_btree.py")
+    model = build_test_tree_model1()
+    model.dump_file(config.src_path + "\\abc_btree.btree")
     exporter = BTreeModelPythonExporter(model)
-    exporter.export("btree_export.py")
+    exporter.export()
