@@ -1,0 +1,19 @@
+{
+    "ai2.runtime.agent": {
+        "ActionAgent": {
+            "log": [
+                "msg"
+            ],
+            "set_blackboard": [
+                "dst_name",
+                "expression"
+            ],
+            "push_fsm": [
+                "fsm_name"
+            ],
+            "push_tree": [
+                "tree_name"
+            ]
+        }
+    }
+}

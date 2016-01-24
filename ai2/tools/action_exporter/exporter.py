@@ -23,7 +23,11 @@ class Exporter(object):
                 current_package[c.__name__] = current_class
                 for action in c.to_export:
                     arg_spec = inspect.getargspec(action)
-                    current_action = arg_spec.args
+                    args = arg_spec.args
+                    if len(args) < 2:
+                        print("action function should have at least 2 arguments: self, node")
+                        assert(False)
+                    current_action = arg_spec.args[2:]
                     current_class[action.__name__] = current_action
 
         with open(path, "w", encoding="utf-8") as ofile:

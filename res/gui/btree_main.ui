@@ -26,7 +26,7 @@
      <x>0</x>
      <y>0</y>
      <width>1006</width>
-     <height>26</height>
+     <height>23</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -89,7 +89,7 @@
           <x>0</x>
           <y>0</y>
           <width>396</width>
-          <height>797</height>
+          <height>803</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -175,7 +175,7 @@
     <string>Insert</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+Ins</string>
+    <string>Ins</string>
    </property>
   </action>
   <action name="actionPaste">

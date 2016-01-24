@@ -38,6 +38,8 @@ class BTreeEditorMainWindow(object):
         self.mdi.setTabsMovable(True)
         self.mdi.setTabsClosable(True)
         self.mdi.setTabShape(QTabWidget.Rounded)
+        self.mdi.subWindowActivated.connect(self.active_subwindow_changed)
+        self.dock_content_cnt = 0
         self.dock_anchor = self.window.dockAnchor
         self.dock_anchor.layout().setAlignment(Qt.AlignTop)
 
@@ -60,6 +62,8 @@ class BTreeEditorMainWindow(object):
     def init_common_logic(self):
         self.tree_fragment = None
 
+        self.active_instance = None
+
     def close_handler(self, ev):
         l = self.mdi.subWindowList()
         if len(l) != 0:
@@ -71,6 +75,22 @@ class BTreeEditorMainWindow(object):
 
     def remove_instance(self, ins):
         self.instances.remove(ins)
+
+    def add_dock_content(self, widget):
+        self.clear_dock_contents()
+        self.dock_anchor.layout().addWidget(widget)
+
+    def get_dock_contents(self):
+        l = self.dock_anchor.layout()
+        ret = []
+        for i in range(l.count()):
+            ret.append(l.itemAt(i).widget())
+        return ret
+
+    def clear_dock_contents(self):
+        ws = self.get_dock_contents()
+        for w in ws:
+            w.deleteLater()
 
     def get_seq(self):
         self.seq += 1
@@ -91,8 +111,8 @@ class BTreeEditorMainWindow(object):
         vm.set_modified(True)
 
     def file_already_open(self, pth):
+        pth = os.path.abspath(pth)
         for i in self.instances:
-            pth = os.path.abspath(pth)
             if pth == i.file_path:
                 return i
         return None
@@ -189,6 +209,24 @@ class BTreeEditorMainWindow(object):
         if w is None:
             return
         self.tree_fragment = w.instance.vm.cut_handler()
+
+    def active_subwindow_changed(self, subwindow):
+        if subwindow and self.active_instance and subwindow is self.active_instance.sub_window:
+            return
+        prev_instance = self.active_instance
+        next_instance = None
+        if subwindow is not None:
+            for i in self.instances:
+                if i.sub_window is subwindow:
+                    next_instance = i
+                    break
+            else:
+                assert(False) # can't find an existing subwindow?!
+        if prev_instance:
+            prev_instance.deactivation_handler()
+        if next_instance:
+            next_instance.activation_handler()
+        self.active_instance = next_instance
 
 
 def run():

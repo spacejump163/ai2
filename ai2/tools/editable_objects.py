@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import \
     QFormLayout, QVBoxLayout,\
     QGroupBox, QComboBox, QLineEdit, QPlainTextEdit, QPushButton, \
     QHBoxLayout, QSizePolicy, QCheckBox
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QApplication
 from PyQt5.uic import loadUi
 import sys
@@ -55,11 +55,20 @@ class StringValue(TypedValue):
         p = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         w.setSizePolicy(p)
         w.setPlainText(self._v)
+        """
         def changed():
             nv = w.toPlainText()
             self._v = nv
             modify_callback(current_name, self, w)
-        w.textChanged.connect(changed)
+        w.focusOutEvent.connect(changed)
+        """
+        org = w.focusOutEvent
+        def stub(event):
+            org(event)
+            nv = w.toPlainText()
+            self._v = nv
+            modify_callback(current_name, self, w)
+        w.focusOutEvent = stub
         return w
 
     def _build_single_line_editor(self, modify_callback, current_name):
@@ -68,8 +77,9 @@ class StringValue(TypedValue):
         def changed():  # have to use closure since we need to read from widget
             nv = w.text()
             self._v = self._checker(nv)
-            modify_callback(current_name, self, w)
             w.setText(str(self._v))
+            modify_callback(current_name, self, w)
+
         w.editingFinished.connect(changed)
         return w
 
@@ -123,11 +133,19 @@ class EnumeratorValue(TypedValue):
         super(EnumeratorValue, self).__init__()
         if v is None:
             v = choice_provider.values[0]
+            idx = 0
+        else:
+            idx = choice_provider.values.inex(v)
         self._v = v
+        self._index = idx
         self._choice_provider = choice_provider
+
+    def get_index(self):
+        return self._index
 
     def assign(self, v):
         self._v = v
+        self._index = self._choice_provider.values.index(v)
 
     def to_editor(self, modify_callback, current_name):
         w = QComboBox()
@@ -142,6 +160,7 @@ class EnumeratorValue(TypedValue):
         def changed(idx):
             values = self._choice_provider.values
             self._v = values[idx]
+            self._index = idx
             modify_callback(current_name, self, w)
 
         w.currentIndexChanged.connect(changed)

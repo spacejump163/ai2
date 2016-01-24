@@ -1,4 +1,5 @@
 {
-    "export_path": "d:\\checkout\\ai2\\export",
-    "src_path": "d:\\checkout\\ai2\\btree"
+	"action_info_path": "e:\\checkout\\ai2\\actions.json",
+    "export_path": "e:\\checkout\\ai2\\export",
+    "src_path": "e:\\checkout\\ai2\\btree"
 }

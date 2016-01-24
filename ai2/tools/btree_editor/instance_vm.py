@@ -29,8 +29,9 @@ class BTreeInstanceVM(object):
         self.sub_window.setAttribute(Qt.WA_DeleteOnClose)
         self.update_title()
         self.btree_view.closeEvent = self.close_handler
-        self.sub_window.show()
         parent.instances.append(self)
+        self.sub_window.show()
+
 
         self.vm.refresh()
 
@@ -39,7 +40,7 @@ class BTreeInstanceVM(object):
         self.btree_view = NodeEditorView(self.btree_scene)
         self.btree_view.setAttribute(Qt.WA_DeleteOnClose)
         self.btree_scene.setSceneRect(AREA)
-        self.vm = NodeEditorVM(self.model, self.btree_view, self.btree_scene)
+        self.vm = NodeEditorVM(self.model, self.btree_view, self.btree_scene, self.parent)
 
     def set_dirty(self):
         self.set_modified(True)
@@ -63,3 +64,11 @@ class BTreeInstanceVM(object):
                 return
         """
         self.parent.remove_instance(self)
+
+    def activation_handler(self):
+        #print("%s about to be activated" % self)
+        pass
+
+    def deactivation_handler(self):
+        #print("%s about to be deactivated" % self)
+        self.vm.cancel_selection()

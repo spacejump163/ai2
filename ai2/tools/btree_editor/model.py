@@ -1,4 +1,5 @@
 # -*- encoding: utf-8 -*-
+import json
 import os
 import pickle
 import pprint
@@ -12,23 +13,35 @@ from ai2.tools.editable_objects import \
 
 
 class ColorProvider(ChoiceProvider):
+    from PyQt5.QtCore import Qt
     choices = (
-        "red",
         "green",
+        "red",
         "yellow",
-        "purple",
-        "grey",
+        "gray",
         "white",
+        "blue",
+        "cyan",
     )
-    values = choices
+    values = (
+        Qt.green,
+        Qt.red,
+        Qt.yellow,
+        Qt.gray,
+        Qt.white,
+        Qt.blue,
+        Qt.cyan,
+    )
+    del Qt
 
 
 class NodeModel(object):
     category = "invalid_category"
     type_display_name = category
 
-    #editable_info_template
+    # editable_info_template
     EIT = (
+        ("name", ""),
         ("comment", "\n",),
         ("color", ColorProvider),
     )
@@ -54,8 +67,15 @@ class NodeModel(object):
     def get_name(self):
         return self.category + str(self.uid)
 
+    def get_bg_color(self):
+        return self.editable_info.color.get_value()
+
     def get_display_text(self):
-        return self.type_display_name + str(self.uid)
+        s = self.editable_info.name.get_value()
+        if s == "":
+            return self.type_display_name + str(self.uid)
+        else:
+            return s
 
     def get_name_symbol(self):
         return SymbolName(self.get_name())
@@ -69,6 +89,15 @@ class NodeModel(object):
             idx = len(self.children)
         self.children.insert(idx, node)
         node.parent = self
+
+    def get_editor(self, refresh_handler):
+
+        def callback(path, node, editor):
+            refresh_handler()
+
+        return self.editable_info.to_editor(
+            callback,
+            self.editable_info.get_name())
 
 
 class RootModel(NodeModel):
@@ -114,6 +143,7 @@ class UntilModel(NodeModel):
     category = defs.NT_UNTIL
     type_display_name = "Until"
 
+
 class NotModel(NodeModel):
     category = defs.NT_NOT
     type_display_name = "Not"
@@ -142,17 +172,26 @@ class CallModel(NodeModel):
         return self.editable_info.tree_name
 
 
-class MethodNameProvider(object):
-    choices = (
-        "func0",
-        "func1",
-        "func2",
-        "func3",
-    )
-    values = choices
+def init_action_data():
+    choices = ["no action"]
+    values = [""]
+    arglists = [()]
+    with open(config.action_info_path) as action_info_file:
+        action_info = json.load(action_info_file)
+    for pkg_name, clzs in action_info.items():
+        for clz_name, acts in clzs.items():
+            for act_name, arglist in acts.items():
+                choices.append("%s.%s" % (clz_name, act_name))
+                values.append(act_name)
+                arglists.append(arglist)
+    return choices, values, arglists
 
 
-class ParamTypeProvider(object):
+class MethodNameProvider(ChoiceProvider):
+    choices, values, arglists = init_action_data()
+
+
+class ParamTypeProvider(ChoiceProvider):
     values = (
         defs.PAR_CONST,
         defs.PAR_BB,
@@ -183,12 +222,36 @@ class ActionModel(NodeModel):
         return tuple([info.enter, info.leave])
 
     def get_display_text(self):
-        itr = self.editable_info.enter.__iter__()
-        func_name = itr.__next__().get_name()
-        args = [repr(i) for i in itr]
-        arg_str = ", ".join(map(lambda x: repr(x), args))
-        return "%s(%s)" % (func_name, arg_str)
+        s = self.editable_info.name.get_value()
+        if s == "":
+            itr = self.editable_info.enter.__iter__()
+            func_name = itr.__next__().get_name()
+            arg_str = ", ".join(map(lambda x: repr(x), itr))
+            return "%s(%s)" % (func_name, arg_str)
+        else:
+            return s
 
+    def get_editor(self, refresh_handler):
+
+        def callback(path, node, editor):
+            if path == "info.enter.act_name":
+                parent = self.editable_info.enter
+                idx = parent.act_name.get_index()
+                arglist = node._choice_provider.arglists[idx]
+                parent.clear_tail()
+                TypedValueBuilder.add_simple_fields(parent, *arglist)
+            elif path == "info.leave.act_name":
+                parent = self.editable_info.leave
+                idx = parent.act_name.get_index()
+                arglist = node._choice_provider.arglists[idx]
+                parent.clear_tail()
+                TypedValueBuilder.add_simple_fields(parent, *arglist)
+            refresh_handler()
+
+        w = self.editable_info.to_editor(
+            callback,
+            self.editable_info.get_name())
+        return w
 
 class SymbolName(object):
     def __init__(self, symbol):
@@ -284,7 +347,6 @@ class BTreeModel(object):
         root.uid = self.get_uid()
         for c in root.children:
             self.reuid_walker(c)
-
 
     def cut_tree(self, node):
         parent = node.parent

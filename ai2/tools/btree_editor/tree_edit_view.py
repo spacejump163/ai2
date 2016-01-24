@@ -68,7 +68,8 @@ class BoxOutline(QGraphicsItem):
 
 
 class BasicNode(QGraphicsItemGroup):
-    def __init__(self, model, manager, bg_color=Qt.green, text_color=Qt.black):
+    def __init__(self, model, manager, text_color=Qt.black):
+        bg_color = model.get_bg_color()
         super(BasicNode, self).__init__()
         self.model = model
         text = model.get_display_text()
@@ -185,10 +186,11 @@ class TreeNodeLayouter(object):
 
 
 class NodeEditorVM(object):
-    def __init__(self, model, view, scene):
+    def __init__(self, model, view, scene, parent_vm):
         self.view = view
         self.scene = scene
         self.model = model
+        self.parent_vm = parent_vm
         self.selected_node = None
         self.selected_effect = None
         self.graphics_root = None
@@ -196,9 +198,6 @@ class NodeEditorVM(object):
     ###########################################################################
     # display refresh related
     ###########################################################################
-    def clear(self):
-        self.scene.clear()
-
     def display_tree_model(self):
         self.graphics_root = root = self.build_tree(self.model.root)
         layouter = TreeNodeLayouter(root)
@@ -240,9 +239,22 @@ class NodeEditorVM(object):
         return None
 
     def refresh(self):
-        self.clear()
+        self.clean_selection_effect()
+        self.scene.clear()
         self.display_tree_model()
-        self.set_selection()
+        if self.selected_node is None:
+            return
+        g = self.find_graphics_for_node(self.selected_node)
+        g.setSelected(True)
+
+    ###########################################################################
+    # selection related
+    ###########################################################################
+    def cancel_selection(self):
+        if self.selected_node is None:
+            return
+        cnode = self.find_graphics_for_node(self.selected_node)
+        cnode.setSelected(False)
 
     def selection_changed(self, graphics_node, state):
         if state == 0:
@@ -270,19 +282,16 @@ class NodeEditorVM(object):
         self.selected_effect = self.scene.addRect(self.enlarge_rect(rect), selection_pen)
         self.selected_effect.setPos(cnode.pos())
         self.selected_effect.setZValue(0.5)
+        self.parent_vm.add_dock_content(self.selected_node.get_editor(self.refresh))
 
     def clean_selection_effect(self):
-        self.scene.removeItem(self.selected_effect)
+        self.parent_vm.clear_dock_contents()
+        if self.selected_effect:
+            self.scene.removeItem(self.selected_effect)
         self.selected_effect = None
 
-    def set_selection(self):
-        if self.selected_node is None:
-            return
-        g = self.find_graphics_for_node(self.selected_node)
-        g.setSelected(True)
-
     ###########################################################################
-    # editing related
+    # graph editing related
     ###########################################################################
 
     def insert_handler(self):
