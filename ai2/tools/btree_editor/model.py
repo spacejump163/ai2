@@ -3,6 +3,7 @@ import json
 import os
 import pickle
 import pprint
+import logging
 
 import ai2.runtime.defs as defs
 from ai2.tools.btree_editor.btree_config import config
@@ -10,6 +11,9 @@ from ai2.tools.editable_objects import \
     StringValue, IntValue, FloatValue, BoolValue,\
     EnumeratorValue, \
     ListValue, StructValue, TypedValueBuilder, ChoiceProvider
+
+
+logger = logging.getLogger("ai2.tools.btree_editor")
 
 
 class ColorProvider(ChoiceProvider):
@@ -126,7 +130,25 @@ class ProbabilityModel(NodeModel):
     EIT = NodeModel.EIT + (("weight", [1.0]),)
 
     def data_to_tuple(self):
-        return tuple(self.editable_info.weights)
+        weights = [w.get_value() for w in self.editable_info.weight]
+        if len(weights) != len(self.children):
+            logger.fatal("probability weight length doesn't match children length")
+            if len(weights) > len(self.children):
+                weights = weights[:len(self.children)]
+            else:
+                if len(weights) == 0:
+                    weights = [1] * len(self.children)
+                else:
+                    weights += [weights[-1]] * (len(weights) - len(self.children))
+        distribution = list(weights)
+        length = len(distribution)
+        if length == 1:
+            return (1,)
+
+        for i in range(1,length):
+            distribution[i] += distribution[i-1]
+
+        return tuple(distribution)
 
 
 class IfElseModel(NodeModel):
@@ -159,7 +181,7 @@ class AlwaysModel(NodeModel):
         super(AlwaysModel, self).__init__()
 
     def data_to_tuple(self):
-        return self.editable_info.boolean
+        return self.editable_info.truth_value.get_value()
 
 
 class CallModel(NodeModel):
@@ -208,6 +230,11 @@ class ActionModel(NodeModel):
     category = defs.NT_ACT
     type_display_name = "Action"
 
+    arg_desc = (
+        ("param_type", ParamTypeProvider),
+        ("var_name", ""),
+    )
+
     EIT = NodeModel.EIT + (
         ("enter", (
             ("act_name", MethodNameProvider),
@@ -219,17 +246,31 @@ class ActionModel(NodeModel):
 
     def data_to_tuple(self):
         info = self.editable_info
-        return tuple([info.enter, info.leave])
+        return info.enter, info.leave
+
+    @staticmethod
+    def format_param(param):
+        tp = param.param_type.get_value()
+        if tp == defs.PAR_CONST:
+            return "C(%s)" % param.var_name
+        elif tp == defs.PAR_BB:
+            return "B(%s)" % param.var_name.get_value()
+        elif tp == defs.PAR_PROP:
+            return "P(%s)" % param.var_name.get_value()
+        else:
+            assert(False)
 
     def get_display_text(self):
         s = self.editable_info.name.get_value()
-        if s == "":
-            itr = self.editable_info.enter.__iter__()
-            func_name = itr.__next__().get_name()
-            arg_str = ", ".join(map(lambda x: repr(x), itr))
+        if s != "":
+            return s
+        itr = self.editable_info.enter.__iter__()
+        func_name = itr.__next__().get_value()
+        if func_name != "":
+            arg_str = ", ".join(map(self.format_param, itr))
             return "%s(%s)" % (func_name, arg_str)
         else:
-            return s
+            return super().get_display_text()
 
     def get_editor(self, refresh_handler):
 
@@ -239,13 +280,13 @@ class ActionModel(NodeModel):
                 idx = parent.act_name.get_index()
                 arglist = node._choice_provider.arglists[idx]
                 parent.clear_tail()
-                TypedValueBuilder.add_simple_fields(parent, *arglist)
+                TypedValueBuilder.add_fields_with_template(parent, self.arg_desc, *arglist)
             elif path == "info.leave.act_name":
                 parent = self.editable_info.leave
                 idx = parent.act_name.get_index()
                 arglist = node._choice_provider.arglists[idx]
                 parent.clear_tail()
-                TypedValueBuilder.add_simple_fields(parent, *arglist)
+                TypedValueBuilder.add_fields_with_template(parent, self.arg_desc, *arglist)
             refresh_handler()
 
         w = self.editable_info.to_editor(
@@ -262,18 +303,34 @@ class SymbolName(object):
 
 
 class CodeFragment(object):
-    compile_template = """compile({CODE_BODY}, "<string>", "exec")"""
-
-    def __init__(self, code):
+    compile_template = """compile({CODE_BODY}, "<string>", {MODE})"""
+    def __init__(self, code, flag="exec"):
         self.code = code
+        self.flag = flag
 
     def __repr__(self):
-        body = self.compile_template.format(CODE_BODY=repr(self.code))
+        body = self.compile_template.format(
+            CODE_BODY=repr(self.code),
+            MODE=repr(self.flag)
+        )
         return body
 
 
+def translate_args(args):
+    l = []
+    for a in args:
+        if a.param_type.get_value() == defs.PAR_CONST:
+            l.append(
+                (defs.PAR_CONST,
+                 eval(a.var_name.get_value()),
+                 a.expr_name.get_value()))
+        else:
+            l.append(a)
+    return l
+
+
 class ConditionModel(NodeModel):
-    category = defs.NT_COMP
+    category = defs.NT_COND
     type_display_name = "Condition"
 
     arg_desc = (
@@ -281,27 +338,44 @@ class ConditionModel(NodeModel):
         ("var_name", ""),
         ("expr_name", ""),
     )
+
     EIT = NodeModel.EIT + (
-        ("expr", "\n"),
-        ("iargs", [arg_desc])
+        ("expr", ""),
+        ("iargs", [arg_desc]),
     )
+
+    def get_display_text(self):
+        s = self.editable_info.name.get_value()
+        if s != "":
+            return s
+        return self.editable_info.expr.get_value()
 
     def data_to_tuple(self):
         info = self.editable_info
-        return info.expr, info.iargs
+        return CodeFragment(info.expr, "eval"), translate_args(info.iargs)
 
 
-class ComputeModel(ConditionModel):
+class ComputeModel(NodeModel):
     category = defs.NT_COMP
     type_display_name = "Compute"
 
-    EIT = ConditionModel.EIT + (
-        ("oargs", [ConditionModel.arg_desc]),
+    arg_desc = (
+        ("param_type", ParamTypeProvider),
+        ("var_name", ""),
+        ("expr_name", ""),
+    )
+
+    EIT = NodeModel.EIT + (
+        ("expr", "\n"),
+        ("iargs", [arg_desc]),
+        ("oargs", [arg_desc]),
     )
 
     def data_to_tuple(self):
         info = self.editable_info
-        return info.expr, info.iargs, info.oargs
+        return CodeFragment(info.expr, "exec"), \
+               translate_args(info.iargs), \
+               translate_args(info.oargs)
 
 
 class WaitForModel(NodeModel):
@@ -311,6 +385,9 @@ class WaitForModel(NodeModel):
     EIT = NodeModel.EIT + (
         ("event", ""),
     )
+
+    def get_display_text(self):
+        return "Wait(%s)" % self.editable_info.event.get_value()
 
     def data_to_tuple(self):
         return self.editable_info.event

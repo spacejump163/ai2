@@ -1,18 +1,26 @@
 {
     "ai2.runtime.agent": {
         "ActionAgent": {
-            "log": [
-                "msg"
+            "nop_leave": [],
+            "nop_enter": [],
+            "test_action_leave": [
+                "para"
+            ],
+            "push_fsm": [
+                "fsm_name"
             ],
             "set_blackboard": [
                 "dst_name",
                 "expression"
             ],
-            "push_fsm": [
-                "fsm_name"
+            "log": [
+                "msg"
             ],
             "push_tree": [
                 "tree_name"
+            ],
+            "test_action_enter": [
+                "para"
             ]
         }
     }

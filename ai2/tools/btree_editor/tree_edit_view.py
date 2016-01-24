@@ -239,6 +239,7 @@ class NodeEditorVM(object):
         return None
 
     def refresh(self):
+        self.parent_vm.set_dirty()
         self.clean_selection_effect()
         self.scene.clear()
         self.display_tree_model()
@@ -282,10 +283,10 @@ class NodeEditorVM(object):
         self.selected_effect = self.scene.addRect(self.enlarge_rect(rect), selection_pen)
         self.selected_effect.setPos(cnode.pos())
         self.selected_effect.setZValue(0.5)
-        self.parent_vm.add_dock_content(self.selected_node.get_editor(self.refresh))
+        self.parent_vm.parent.add_dock_content(self.selected_node.get_editor(self.refresh))
 
     def clean_selection_effect(self):
-        self.parent_vm.clear_dock_contents()
+        self.parent_vm.parent.clear_dock_contents()
         if self.selected_effect:
             self.scene.removeItem(self.selected_effect)
         self.selected_effect = None

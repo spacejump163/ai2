@@ -40,7 +40,7 @@ class BTreeInstanceVM(object):
         self.btree_view = NodeEditorView(self.btree_scene)
         self.btree_view.setAttribute(Qt.WA_DeleteOnClose)
         self.btree_scene.setSceneRect(AREA)
-        self.vm = NodeEditorVM(self.model, self.btree_view, self.btree_scene, self.parent)
+        self.vm = NodeEditorVM(self.model, self.btree_view, self.btree_scene, self)
 
     def set_dirty(self):
         self.set_modified(True)
@@ -53,7 +53,7 @@ class BTreeInstanceVM(object):
         self.sub_window.setWindowTitle(self.file_path + "[*]")
 
     def close_handler(self, ev):
-        """
+
         if self.modified:
             ret = QMessageBox().question(
                 self.btree_view, "Confirm",
@@ -62,7 +62,6 @@ class BTreeInstanceVM(object):
             if ret == QMessageBox.No:
                 ev.ignore()
                 return
-        """
         self.parent.remove_instance(self)
 
     def activation_handler(self):

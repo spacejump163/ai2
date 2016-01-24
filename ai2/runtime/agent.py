@@ -92,6 +92,8 @@ class Agent(object):
         raise NotImplemented
 
     def agent_action(self, node, method_name, arg_list):
+        if method_name == "":
+            return
         f = getattr(self, method_name)
         args = [self.get_value(i) for i in arg_list]
         return f(node, *args)
@@ -126,27 +128,6 @@ class Agent(object):
         self._enabled = False
         raise NotImplemented
 
-    def nop_enter(self, node):
-        logger.debug("%s:entered nop action node" % self)
-        node.finish(True)
-
-    def test_action_enter(self, node, para):
-        logger.debug("%s:entered test action node" % self)
-
-        def cb(state):
-            node.finish(state)
-        self.blackboard[para] = (cb, True)
-
-    def test_action_leave(self, node, para):
-        self.blackboard[para] = False
-
-    def nop_leave(self, node):
-        logger.debug("%s:leaving nop action node" % self)
-
-    def log_enter(self, node, msg):
-        logger.debug("%s:%s" % (self, msg))
-        node.finish(True)
-
     def is_ready(self):
         for n in self.fronts:
             if n.state == n.BLOCKING:
@@ -158,16 +139,16 @@ class Agent(object):
 
     def execute(self, dst, formula, src):
         local = {}
-        for tp, val, name in src:
-            local[name] = self.get_value((tp, val))
+        for tp, var_name, expr_name in src:
+            local[expr_name] = self.get_value((tp, var_name))
         exec(formula, {}, local)
-        for tp, val, name in dst:
-            self.set_value((tp, val, local[name]))
+        for tp, var_name, expr_name in dst:
+            self.set_value((tp, var_name, local[expr_name]))
 
     def evaluate(self, formula, src):
         local = {}
-        for tp, val, name in src:
-            local[name] = self.get_value((tp, val))
+        for tp, var_name, expr_name in src:
+            local[expr_name] = self.get_value((tp, var_name))
         r = eval(formula, {}, local)
         return r
 
@@ -230,6 +211,7 @@ class Agent(object):
 class ActionAgent(Agent):
     def log(self, node, msg):
         logger.debug("%s:%s:%s" % (self, node,  msg))
+        node.finish(True)
 
     def push_fsm(self, node, fsm_name):
         nfsm = fsm.Fsm(fsm_name)
@@ -243,6 +225,31 @@ class ActionAgent(Agent):
         val = eval(expression, None, None)
         self.set_value((defs.PAR_BB, dst_name, val))
 
-    to_export = {log, push_fsm, push_tree, set_blackboard}
+    def nop(self, node):
+        logger.info("nop action called")
+
+    def nop_enter(self, node):
+        logger.debug("%s:entered nop action node" % self)
+        node.finish(True)
+
+    def nop_leave(self, node):
+        logger.debug("%s:leaving nop action node" % self)
+
+    def test_action_enter(self, node, para):
+        logger.debug("%s:entered test action node" % self)
+
+        def cb(state):
+            node.finish(state)
+        self.blackboard[para] = (cb, True)
+
+    def test_action_leave(self, node, para):
+        self.blackboard[para] = False
+
+
+    to_export = (
+        log, push_fsm, push_tree, set_blackboard,
+        nop_enter, nop_leave,
+        test_action_enter, test_action_leave,
+    )
 
 to_export = {ActionAgent}
