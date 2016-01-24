@@ -8,10 +8,10 @@ from ai2.tools.btree_editor.btree_config import config
 from ai2.tools.editable_objects import \
     StringValue, IntValue, FloatValue, BoolValue,\
     EnumeratorValue, \
-    ListValue, StructValue
+    ListValue, StructValue, TypedValueBuilder, ChoiceProvider
 
 
-class ColorProvider(object):
+class ColorProvider(ChoiceProvider):
     choices = (
         "red",
         "green",
@@ -27,19 +27,17 @@ class NodeModel(object):
     category = "invalid_category"
     type_display_name = category
 
+    #editable_info_template
+    EIT = (
+        ("comment", "\n",),
+        ("color", ColorProvider),
+    )
+
     def __init__(self):
         self.uid = 0
         self.children = []
         self.parent = None
-        self.editable_info = self.build_editable_info()
-
-    def build_editable_info(self):
-        comment = StringValue()
-        comment.set_name("comment")
-        color = EnumeratorValue(ColorProvider, ColorProvider.choices[0])
-        color.set_name("color")
-        s = StructValue(comment, color)
-        return s
+        self.editable_info = TypedValueBuilder.build_object(self.EIT, "info")
 
     @property
     def debug_info(self):
@@ -96,12 +94,7 @@ class ProbabilityModel(NodeModel):
     category = defs.NT_PSEL
     type_display_name = "Probability"
 
-    def build_editable_info(self):
-        s = super(ProbabilityModel, self).build_editable_info()
-        lst = ListValue(FloatValue())
-        lst.set_name = "weights"
-        s += lst
-        return s
+    EIT = NodeModel.EIT + (("weight", [1.0]),)
 
     def data_to_tuple(self):
         return tuple(self.editable_info.weights)
@@ -130,15 +123,10 @@ class AlwaysModel(NodeModel):
     category = defs.NT_ALWAYS
     type_display_name = "Always"
 
+    EIT = NodeModel.EIT + (("truth_value", True),)
+
     def __init__(self):
         super(AlwaysModel, self).__init__()
-
-    def build_editable_info(self):
-        s = super(AlwaysModel, self).build_editable_info()
-        b = BoolValue()
-        b.set_name("boolean")
-        s += b
-        return s
 
     def data_to_tuple(self):
         return self.editable_info.boolean
@@ -148,12 +136,7 @@ class CallModel(NodeModel):
     category = defs.NT_CALL
     type_display_name = "Call"
 
-    def build_editable_info(self):
-        s = super(CallModel, self).build_editable_info()
-        tree_name = StringValue()
-        tree_name.set_name("tree_name")
-        s += tree_name
-        return s
+    EIT = NodeModel.EIT + (("tree_name", ""),)
 
     def data_to_tuple(self):
         return self.editable_info.tree_name
@@ -170,49 +153,30 @@ class MethodNameProvider(object):
 
 
 class ParamTypeProvider(object):
-    choices = (
+    values = (
         defs.PAR_CONST,
         defs.PAR_BB,
         defs.PAR_PROP,
     )
-    values = choices
+    choices = (
+        "常数",
+        "黑板值",
+        "对象属性",
+    )
 
 
 class ActionModel(NodeModel):
     category = defs.NT_ACT
     type_display_name = "Action"
 
-    def build_param_type(self):
-        # param_struct
-        e = EnumeratorValue(ParamTypeProvider, None)
-        e.name = "param_type"
-        v = StringValue()
-        v.name = "value"
-        param_struct = StructValue(e, v)
-
-    def build_action_arg_struct(self, *names):
-        """"
-        this method is useless since it's only for initialization
-        """
-        st = StructValue()
-        # name selector
-        act_name = EnumeratorValue(MethodNameProvider, None)
-        act_name.set_name("act_name")
-        st += act_name
-        for n in names:
-            field = self.build_param_type()
-            field.set_name(n)
-            st += field
-        return st
-
-    def build_editable_info(self):
-        st = super(ActionModel, self).build_editable_info()
-        enter = self.build_action_arg_struct()
-        enter.set_name("enter")
-        leave = self.build_action_arg_struct()
-        leave.set_name("leave")
-        st += (enter, leave)
-        return st
+    EIT = NodeModel.EIT + (
+        ("enter", (
+            ("act_name", MethodNameProvider),
+        )),
+        ("leave", (
+            ("act_name", MethodNameProvider),
+        ))
+    )
 
     def data_to_tuple(self):
         info = self.editable_info
@@ -249,40 +213,28 @@ class ConditionModel(NodeModel):
     category = defs.NT_COMP
     type_display_name = "Condition"
 
-    def build_code_arg(self):
-        e = EnumeratorValue(ParamTypeProvider, None)
-        e.set_name("param_type")
-        n0 = StringValue()
-        n0.set_name("var_name")
-        n1 = StringValue()
-        n1.set_name("expr_name")
-        s = StructValue(e, n0, n1)
-        l = ListValue(s)
-        return l
-
-    def build_editable_info(self):
-        st = super(ConditionModel, self).build_editable_info()
-        iargs = self.build_code_arg()
-        iargs.set_name("iargs")
-        fragment = StringValue()
-        fragment.set_name("expr")
-        st += (fragment, iargs)
-        return st
+    arg_desc = (
+        ("param_type", ParamTypeProvider),
+        ("var_name", ""),
+        ("expr_name", ""),
+    )
+    EIT = NodeModel.EIT + (
+        ("expr", "\n"),
+        ("iargs", [arg_desc])
+    )
 
     def data_to_tuple(self):
         info = self.editable_info
         return info.expr, info.iargs
 
+
 class ComputeModel(ConditionModel):
     category = defs.NT_COMP
     type_display_name = "Compute"
 
-    def build_editable_info(self):
-        st = super(ComputeModel, self).build_editable_info()
-        oargs = self.build_code_arg()
-        oargs.set_name("oargs")
-        st += oargs
-        return st
+    EIT = ConditionModel.EIT + (
+        ("oargs", [ConditionModel.arg_desc]),
+    )
 
     def data_to_tuple(self):
         info = self.editable_info
@@ -293,12 +245,9 @@ class WaitForModel(NodeModel):
     category = defs.NT_WAIT
     type_display_name = "WaitFor"
 
-    def build_editable_info(self):
-        st = super(WaitForModel).build_editable_info()
-        event = StringValue()
-        event.set_name("event")
-        st += event
-        return st
+    EIT = NodeModel.EIT + (
+        ("event", ""),
+    )
 
     def data_to_tuple(self):
         return self.editable_info.event
