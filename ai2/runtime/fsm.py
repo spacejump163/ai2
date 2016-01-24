@@ -81,3 +81,11 @@ class Fsm(object):
     def transfer_state(self, state_index):
         self._leave_state()
         self._enter_state(state_index)
+
+    def finish(self, _):
+        """
+        a dummy stub to make sure that action can run on both fsm and btree
+        :param _:
+        :return:
+        """
+        return

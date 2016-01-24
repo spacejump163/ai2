@@ -381,19 +381,18 @@ class Action(Node):
         self.agent.agent_action(self, action_name, action_args)
 
     def leave(self):
-        if len(self.desc.data) == 2:
-            action_name = self.desc.data[1][0]
-            action_args = self.desc.data[1][1:]
-            self.agent.agent_action(self, action_name, action_args)
+        action_name = self.desc.data[1][0]
+        action_args = self.desc.data[1][1:]
+        self.agent.agent_action(self, action_name, action_args)
 
 
 class Compute(Node):
     __slots__ = ()
 
     def enter(self):
-        oargs = self.desc.data[0]
-        func = self.desc.data[1]
-        iargs = self.desc.data[2]
+        oargs = self.desc.data[2]
+        func = self.desc.data[0]
+        iargs = self.desc.data[1]
         self.agent.execute(oargs, func, iargs)
         self._quick_finish(True)
 

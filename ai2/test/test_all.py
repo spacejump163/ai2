@@ -48,8 +48,9 @@ def state_machine1():
 
 def sequence0():
     logger.debug(">>>>")
-    ta = agent.Agent()
-    ta.set_fsm("sequence_test.fsm0")
+    ta = agent.ActionAgent()
+    ta.blackboard["test_tree"] = "sequence_test.sequence_test0_btree"
+    ta.set_fsm("common.simple_fsm")
     ta.enable(True)
     assert(ta.blackboard["count0"] == 13)
     assert(ta.blackboard["count1"] == 14)
@@ -57,8 +58,9 @@ def sequence0():
 
 def sequence1():
     logger.debug(">>>>")
-    ta = agent.Agent()
-    ta.set_fsm("sequence_test.fsm1")
+    ta = agent.ActionAgent()
+    ta.blackboard["test_tree"] = "sequence_test.sequence_test1_btree"
+    ta.set_fsm("common.simple_fsm")
     ta.enable(True)
     assert(ta.blackboard["count0"] == 1)
     assert(ta.blackboard["count1"] == 2)
@@ -67,9 +69,10 @@ def sequence1():
 def random_sequence0():
     logger.debug(">>>>")
     results = set()
-    for i in range(0, 1000):
-        ta = agent.Agent()
-        ta.set_fsm("random_sequence_test.fsm0")
+    for i in range(0, 100):
+        ta = agent.ActionAgent()
+        ta.set_fsm("common.simple_fsm")
+        ta.blackboard["test_tree"] = "random_sequence_test.random_sequence_test_btree"
         ta.enable(True)
         results.add(ta.blackboard["ret"])
     logger.debug("WARNING: this is not a strict test and you have to be very unlucky not to pass it")
@@ -78,8 +81,9 @@ def random_sequence0():
 
 def select0():
     logger.debug(">>>>")
-    ta = agent.Agent()
-    ta.set_fsm("select_test.fsm0")
+    ta = agent.ActionAgent()
+    ta.set_fsm("common.simple_fsm")
+    ta.blackboard["test_tree"] = "select_test.select_test0_btree"
     ta.enable(True)
     assert(ta.blackboard["count0"] == 13)
     assert(ta.blackboard["count1"] == 14)
@@ -87,8 +91,9 @@ def select0():
 
 def select1():
     logger.debug(">>>>")
-    ta = agent.Agent()
-    ta.set_fsm("select_test.fsm1")
+    ta = agent.ActionAgent()
+    ta.set_fsm("common.simple_fsm")
+    ta.blackboard["test_tree"] = "select_test.select_test1_btree"
     ta.enable(True)
     assert(ta.blackboard["count0"] == 1)
     assert(ta.blackboard["count1"] == 2)
@@ -96,9 +101,10 @@ def select1():
 def probability0():
     logger.debug(">>>>")
     results = {0:0, 1:0, 2:0}
-    for i in range(0, 1000):
-        ta = agent.Agent()
-        ta.set_fsm("probability_test.fsm0")
+    for i in range(0, 100):
+        ta = agent.ActionAgent()
+        ta.set_fsm("common.simple_fsm")
+        ta.blackboard["test_tree"] = "probability_test.probability_test_btree"
         ta.enable(True)
         k = ta.blackboard["ret"]
         results[k] += 1
@@ -108,16 +114,30 @@ def probability0():
 
 def ifelse0():
     logger.debug(">>>>")
-    ta = agent.Agent()
-    ta.set_fsm("if_else_test.fsm0")
+    ta = agent.ActionAgent()
+    ta.set_fsm("common.simple_fsm")
+    ta.blackboard["test_tree"] = "if_else_test.if_else_test0_btree"
     ta.enable(True)
     assert(ta.blackboard["ret"] == 0)
 
 def ifelse1():
     logger.debug(">>>>")
-    ta = agent.Agent()
-    ta.set_fsm("if_else_test.fsm1")
+    ta = agent.ActionAgent()
+    ta.set_fsm("common.simple_fsm")
+    ta.blackboard["test_tree"] = "if_else_test.if_else_test1_btree"
     ta.enable(True)
+    assert(ta.blackboard["ret"] == 1)
+
+def ifelse2():
+    logger.debug(">>>>")
+    ta = agent.ActionAgent()
+    ta.set_fsm("common.simple_fsm")
+    ta.blackboard["test_tree"] = "if_else_test.if_else_test2_btree"
+    ta.blackboard["tv"] = 2
+    ta.enable(True)
+    assert(ta.blackboard["ret"] == 0)
+    ta.blackboard["tv"] = 0
+    ta.fire_event("goon")
     assert(ta.blackboard["ret"] == 1)
 
 def parallel0():
@@ -201,9 +221,13 @@ def call0():
     assert(ta.blackboard["cnt1"] == 4)
 
 
-def test_all():
-    logging.basicConfig(level=logging.WARNING)
+def run():
+    logging.basicConfig(level=logging.DEBUG)
     loader.prefix = "ai2.test."
+
+    state_machine0()
+    state_machine1()
+
     sequence0()
     sequence1()
 
@@ -216,6 +240,10 @@ def test_all():
 
     ifelse0()
     ifelse1()
+    ifelse2()
+
+    logger.debug(">>> finished")
+    return
 
     parallel0()
     parallel1()
@@ -232,9 +260,3 @@ def test_all():
 
     #assert(False)
     logger.debug(">>> finished")
-
-def new_test():
-    logging.basicConfig(level=logging.DEBUG)
-    loader.prefix = "ai2.test."
-    state_machine0()
-    state_machine1()

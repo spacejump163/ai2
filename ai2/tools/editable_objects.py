@@ -94,6 +94,7 @@ class BoolValue(TypedValue):
 
     def to_editor(self, modify_callback, current_name):
         w = QCheckBox()
+        w.setChecked(self._v)
         def changed():
             nv = w.isChecked()
             self._v = nv
@@ -133,34 +134,26 @@ class EnumeratorValue(TypedValue):
         super(EnumeratorValue, self).__init__()
         if v is None:
             v = choice_provider.values[0]
-            idx = 0
         else:
-            idx = choice_provider.values.inex(v)
+            idx = choice_provider.values.index(v)
         self._v = v
-        self._index = idx
         self._choice_provider = choice_provider
 
     def get_index(self):
-        return self._index
+        return self._choice_provider.values.index(self._v)
 
     def assign(self, v):
         self._v = v
-        self._index = self._choice_provider.values.index(v)
 
     def to_editor(self, modify_callback, current_name):
         w = QComboBox()
         choices = self._choice_provider.choices
-        values = self._choice_provider.values
         w.addItems(choices)
-        if self._v in values:
-            idx = values.index(self._v)
-            w.setCurrentIndex(idx)
-        else:
-            assert(False)  # no matching choice
+        idx = self.get_index()
+        w.setCurrentIndex(idx)
         def changed(idx):
             values = self._choice_provider.values
             self._v = values[idx]
-            self._index = idx
             modify_callback(current_name, self, w)
 
         w.currentIndexChanged.connect(changed)
@@ -360,8 +353,13 @@ class TypedValueBuilder(object):
         return v
 
     @classmethod
-    def add_simple_fields(cls, struct, *field_names):
+    def add_string_fields(cls, struct, *field_names):
         fields = [StringValue().set_name(n) for n in field_names]
+        struct += fields
+
+    @classmethod
+    def add_fields_with_template(cls, struct, template, *field_names):
+        fields = [cls.build_object(template, n) for n in field_names]
         struct += fields
 
 TypedValueBuilder.init_map_table()

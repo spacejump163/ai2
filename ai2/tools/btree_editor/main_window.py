@@ -10,7 +10,7 @@ from PyQt5.uic import loadUi
 from ai2.tools.btree_editor.btree_config import config
 from ai2.tools.btree_editor.model import \
     BTreeModel, get_all_node_class, BTreeModelPythonExporter
-from tools.btree_editor.instance_vm import BTreeInstanceVM
+from ai2.tools.btree_editor.instance_vm import BTreeInstanceVM
 
 this_path = os.path.dirname(__file__)
 MAIN_UI_PATH = os.path.join(
@@ -129,8 +129,11 @@ class BTreeEditorMainWindow(object):
             if i:
                 self.mdi.setActiveSubWindow(i.sub_window)
             else:
-                m = BTreeModel.load_file(pth)
-                vm = BTreeInstanceVM(m, self, pth)
+                try:
+                    m = BTreeModel.load_file(pth)
+                    vm = BTreeInstanceVM(m, self, pth)
+                except PermissionError:
+                    pass
 
     def action_save_handler(self):
         w = self.mdi.activeSubWindow()
