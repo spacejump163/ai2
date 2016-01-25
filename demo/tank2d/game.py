@@ -2,7 +2,7 @@
 import math
 import sys
 
-from PyQt5.QtCore import QTimer, QRectF, QPointF
+from PyQt5.QtCore import QTimer, QRectF, QPointF, Qt
 from PyQt5.QtGui import QBitmap, QPainterPath, QColor, QPainter
 from PyQt5.QtWidgets import \
     QGraphicsView, QGraphicsItem, QApplication, QGraphicsScene, QGraphicsItemGroup
@@ -128,7 +128,7 @@ class Tank(GameObject):
         self.fire_cd = 0
 
     def start(self):
-        self.move_forward(10)
+        pass
 
     def update_logic(self):
         super(Tank, self).update_logic()
@@ -160,8 +160,8 @@ class Tank(GameObject):
 
     def update(self):
         super(Tank, self).update()
-        self.move_speed = 50
-        self.rotate_speed = 0
+        #self.move_speed = 50
+        #self.rotate_speed = 0
         self.open_fire()
 
     def take_damage(self, dmg):
@@ -199,19 +199,20 @@ class Missile(GameObject):
 
 
 class Arena(object):
-    GAME_PERIOD = 1.0 / 30
+    FPS = 30.0
+    GAME_PERIOD = 1.0 / FPS
     def __init__(self):
         self.children = []
         self.new_children = []
         self.clock = None
         self.time = 0
-        self.dt = self.GAME_PERIOD
+        self.dt = 1.0 / self.FPS
 
     def start(self):
         if self.clock is None:
             self.clock = QTimer()
             self.clock.timeout.connect(self.update)
-            self.clock.start(self.dt * 1000)
+            self.clock.start(1000.0 / self.FPS)
 
     def pause(self):
         self.clock.stop()
@@ -259,10 +260,7 @@ class App(object):
         self.app = QApplication(sys.argv)
         self.init_scene()
         self.init_game()
-
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update)
-        self.timer.start(100)
+        self.arena.start()
 
     def init_scene(self):
         self.scene = QGraphicsScene()
@@ -280,23 +278,24 @@ class App(object):
         view.show()
 
     def init_game(self):
+        self.init_game_arena()
+        self.init_game_entities()
+
+    def init_game_arena(self):
         self.arena = Arena()
         self.arena.set_scene(self.scene)
-        #missile = Missile(QPointF(0, 0), 0, 400)
-        #self.arena.add(missile)
 
-        tank0 = Tank(QColor(0, 255, 0, 255), 1)
-        tank0.position = QPointF(0, UNIT * 10)
-        tank0.rotation = math.pi * 3 / 2
-        tank0.hp = 20
-        #tank.adjust_aim_clockwise(math.pi / 2)
-        self.arena.add(tank0)
+    def init_game_entity(self, config_id, radius, a):
+        dv = QPointF(math.cos(a), math.sin(a)) * (+radius)
+        config = PLAYER_CONFIGS[config_id]
+        tank = config[0](*config[1:])
+        tank.rotation = math.pi + a
+        tank.position = dv
+        self.arena.add(tank)
 
-        tank1 = Tank(QColor(0, 255, 255, 255), 2)
-        tank1.position = QPointF(0, 0)
-        tank1.rotation = math.pi / 2
-        #tank.adjust_aim_clockwise(math.pi / 2)
-        self.arena.add(tank1)
+    def init_game_entities(self):
+        self.init_game_entity(0, 300, 1 * math.pi / 4)
+        self.init_game_entity(0, 0, 0 * math.pi / 4)
 
     def run(self):
         self.app.exec_()
@@ -304,6 +303,18 @@ class App(object):
     def update(self):
         self.arena.update()
 
+
+class TankAgent(Tank):
+    def __init__(self, color, group):
+        super(TankAgent, self).__init__(color, group)
+        
+
+PLAYER_CONFIGS = (
+    (Tank, Qt.green, 1),
+    (TankAgent, Qt.yellow, 2),
+    #(Qt.red, 3),
+    #(Qt.blue, 4),
+)
 
 def run_game():
     app = App()
