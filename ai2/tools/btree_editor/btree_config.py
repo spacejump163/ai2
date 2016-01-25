@@ -7,7 +7,7 @@ class BTreeConfig(ConfigModule):
     def init_dict(self):
         cdir = os.path.abspath(os.getcwd())
         d = {
-            "action_info_path": os.path.join(cdir, "action.json"),
+            "action_info_path": os.path.join(cdir, "actions.json"),
             "export_path": os.path.join(cdir, "export"),
             "src_path": os.path.join(cdir, "btree"),
         }
