@@ -142,8 +142,9 @@ def ifelse2():
 
 def parallel0():
     logger.debug(">>>>")
-    ta = agent.Agent()
-    ta.set_fsm("parallel_test.fsm0")
+    ta = agent.ActionAgent()
+    ta.set_fsm("common.simple_fsm")
+    ta.blackboard["test_tree"] = "parallel_test.parallel_test0_btree"
     ta.enable(True)
 
     assert(ta.blackboard[22][1] == True)
@@ -156,23 +157,9 @@ def parallel0():
 
 def parallel1():
     logger.debug(">>>>")
-    ta = agent.Agent()
-    ta.set_fsm("parallel_test.fsm0")
-    ta.enable(True)
-
-    assert(ta.blackboard[22][1] == True)
-    assert(ta.blackboard[33][1] == True)
-    assert(ta.is_ready() == False)
-
-    ta.blackboard[22][0](True)
-    assert(ta.blackboard[22] is False)
-    assert(ta.blackboard[33] is False)
-    ta.fire_event("timeout")
-
-def parallel2():
-    logger.debug(">>>>")
-    ta = agent.Agent()
-    ta.set_fsm("parallel_test.fsm1")
+    ta = agent.ActionAgent()
+    ta.set_fsm("common.simple_fsm")
+    ta.blackboard["test_tree"] = "parallel_test.parallel_test1_btree"
     ta.enable(True)
 
     assert(ta.blackboard[22][1] == True)
@@ -184,38 +171,59 @@ def parallel2():
     assert(ta.blackboard[33] is False)
     ta.fire_event("timeout")
 
+def parallel2():
+    logger.debug(">>>>")
+    ta = agent.ActionAgent()
+    ta.set_fsm("common.simple_fsm")
+    ta.blackboard["test_tree"] = "parallel_test.parallel_test2_btree"
+    ta.enable(True)
+
+    assert(ta.blackboard[22][1] == True)
+    assert(ta.blackboard[33][1] == True)
+    assert(ta.is_ready() == False)
+
+    ta.blackboard[22][0](True)
+    assert(ta.blackboard[22] is False)
+    assert(ta.blackboard[33] is False)
+    ta.fire_event("timeout")
+
 def until0():
     logger.debug(">>>>")
-    ta = agent.Agent()
-    ta.set_fsm("until_test.fsm0")
+    ta = agent.ActionAgent()
+    ta.set_fsm("common.simple_fsm")
+    ta.blackboard["test_tree"] = "until_test.until_test_btree"
     ta.enable(True)
     assert(ta.blackboard["cnt"] == 4)
 
 def not0():
     logger.debug(">>>>")
-    ta = agent.Agent()
-    ta.set_fsm("not_test.fsm0")
+    ta = agent.ActionAgent()
+    ta.set_fsm("common.simple_fsm")
+    ta.blackboard["test_tree"] = "not_test.not_test_btree"
     ta.enable(True)
-    assert(ta.blackboard["cnt"] == 4)
+    assert(ta.blackboard["cnt"] == 0)
 
 def always0():
     logger.debug(">>>>")
-    ta = agent.Agent()
-    ta.set_fsm("always_test.fsm0")
+    ta = agent.ActionAgent()
+    ta.set_fsm("common.simple_fsm")
+    ta.blackboard["test_tree"] = "always_test.always_test0_btree"
     ta.enable(True)
     assert(ta.blackboard["cnt"] == 4)
 
 def always1():
     logger.debug(">>>>")
-    ta = agent.Agent()
-    ta.set_fsm("always_test.fsm1")
+    ta = agent.ActionAgent()
+    ta.set_fsm("common.simple_fsm")
+    ta.blackboard["test_tree"] = "always_test.always_test1_btree"
     ta.enable(True)
     assert(ta.blackboard["cnt"] == 1)
 
 def call0():
     logger.debug(">>>>")
-    ta = agent.Agent()
-    ta.set_fsm("call_test.fsm0")
+    ta = agent.ActionAgent()
+    ta.set_fsm("common.simple_fsm")
+    ta.blackboard["test_tree"] = "call_test.call_test0_btree"
     ta.enable(True)
     assert(ta.blackboard["cnt0"] == 2)
     assert(ta.blackboard["cnt1"] == 4)
@@ -242,9 +250,6 @@ def run():
     ifelse1()
     ifelse2()
 
-    logger.debug(">>> finished")
-    return
-
     parallel0()
     parallel1()
     parallel2()
@@ -255,8 +260,6 @@ def run():
 
     always0()
     always1()
-
     call0()
-
-    #assert(False)
     logger.debug(">>> finished")
+    return

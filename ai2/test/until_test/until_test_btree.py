@@ -3,22 +3,22 @@ info = __file__
 
 
 NT_COMP2 = ('NT_COMP',
- ('cnt = 0',
+ (compile('cnt = 0', "<string>", 'exec'),
   [],
   [['PAR_BB', 'cnt', 'cnt']]),
  (),
  '')
 
 
-NT_COMP5 = ('NT_COMP',
- ('cnt == 4',
+NT_COND5 = ('NT_COND',
+ (compile('cnt == 4', "<string>", 'eval'),
   [['PAR_BB', 'cnt', 'cnt']]),
  (),
  '')
 
 
 NT_COMP6 = ('NT_COMP',
- ('cnt += 1',
+ (compile('cnt += 1', "<string>", 'exec'),
   [['PAR_BB', 'cnt', 'cnt']],
   [['PAR_BB', 'cnt', 'cnt']]),
  (),
@@ -27,7 +27,7 @@ NT_COMP6 = ('NT_COMP',
 
 NT_UNTIL3 = ('NT_UNTIL',
  (),
- (NT_COMP5, NT_COMP6),
+ (NT_COND5, NT_COMP6),
  '')
 
 

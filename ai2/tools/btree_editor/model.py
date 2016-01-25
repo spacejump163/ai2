@@ -244,15 +244,32 @@ class ActionModel(NodeModel):
         ))
     )
 
+    @staticmethod
+    def translate_action_struct(astruct):
+        itr = astruct.__iter__()
+        l = [itr.__next__().get_value()]
+        while True:
+            try:
+                a = itr.__next__()
+                tp = a.param_type.get_value()
+                if tp == defs.PAR_CONST:
+                    l.append((defs.PAR_CONST, eval(a.var_name.get_value())))
+                else:
+                    l.append((tp, a.var_name.get_value()))
+            except StopIteration:
+                break
+        return l
+
     def data_to_tuple(self):
         info = self.editable_info
-        return info.enter, info.leave
+        return self.translate_action_struct(info.enter),\
+               self.translate_action_struct(info.leave)
 
     @staticmethod
     def format_param(param):
         tp = param.param_type.get_value()
         if tp == defs.PAR_CONST:
-            return "C(%s)" % param.var_name
+            return "C(%s)" % param.var_name.get_value()
         elif tp == defs.PAR_BB:
             return "B(%s)" % param.var_name.get_value()
         elif tp == defs.PAR_PROP:
