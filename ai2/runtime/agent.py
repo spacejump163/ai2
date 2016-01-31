@@ -78,6 +78,7 @@ class Agent(object):
                 head -= 1
         if receiver is None:
             return False
+        self.stop_btree()
         for fsmi in range(tail, head, -1):
             f = self.fsm_stack[fsmi]
             f.pop_self()
@@ -126,7 +127,8 @@ class Agent(object):
 
     def _stop(self):
         self._enabled = False
-        raise NotImplemented
+        self.stop_btree()
+        self.stop_all_fsm()
 
     def is_ready(self):
         for n in self.fronts:
@@ -152,9 +154,20 @@ class Agent(object):
         r = eval(formula, {}, local)
         return r
 
+    def stop_btree(self):
+        if self.btree:
+            self.btree.interrupt()
+        self.btree = None
+
+    def stop_all_fsm(self):
+        while len(self.fsm_stack):
+            self.fsm_stack[-1].pop_self()
+
     def push_node(self, parent, child_index, node_desc):
+        if parent is None:
+            self.stop_btree()
         clz = nodes.get_node_class(node_desc[0])
-        clz(parent, child_index, node_desc, self)
+        self.btree = clz(parent, child_index, node_desc, self)
 
     def poll_fronts(self):
         need_process = False

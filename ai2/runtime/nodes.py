@@ -39,6 +39,8 @@ class Node(object):
             self.parent.children[self] = retval
 
     def finish(self, retval):
+        if self.state == self.DEAD or self.state == self.FINISHING:
+            return
         self._quick_finish(retval)
         if not self.agent.processing:
             self.agent.poll()
@@ -70,7 +72,7 @@ class Node(object):
 
     def backtrace(self):
         assert(self in self.agent.fronts)
-        assert(self.parent.state in {self.REVISITING, self.BLOCKING, self.WAIT_CHILD})
+        assert((self.parent.state in {self.REVISITING, self.BLOCKING, self.WAIT_CHILD}), self.parent.state)
         self.parent.state = self.REVISITING
         self.agent.fronts.remove(self)
         self.agent.fronts.add(self.parent)
@@ -101,8 +103,8 @@ class Node(object):
         self.leave()
         if self in self.agent.fronts:
             self.agent.fronts.remove(self)
-        for k, v in self.children:
-            v.interrupt()
+        for k in self.children:
+            k.interrupt()
         self.state = self.DEAD
 
     def revisit(self):
@@ -372,7 +374,7 @@ class Call(Node):
 
 
 class Action(Node):
-    __slots__ = ()
+    __slots__ = ("node_state")
 
     def enter(self):
         self.block()  # this is the default action

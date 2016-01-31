@@ -3,7 +3,7 @@ import importlib
 import ai2.runtime.defs as defs
 
 _loaded = {}
-prefix = ""
+prefix = "hexm.server.data.ai_data."
 
 def load_fsm(name, force=False):
     return _load_module(name, force, process_loaded_fsm)
