@@ -1,23 +1,38 @@
+# -*- encoding: utf-8 -*-
 import random
+import logging
 
 import ai2.runtime.defs as defs
 import ai2.runtime.loader as loader
 
+logger = logging.getLogger(__name__)
+
+
 class Node(object):
+    NEW = "NEW"
     ENTERING = "ENTERING"
-    REVISITING = "REVISITING"  # for non-leaf nodes only, called when returned from a child
-    FINISHING = "FINISHING"
+    AWAKEN = "AWAKEN"
+    REVISITING = "REVISITING"
     BLOCKING = "BLOCKING"
     WAIT_CHILD = "WAIT_CHILD"
+    LEAVING = "LEAVING"
     DEAD = "DEAD"
-    READY_STATES = {ENTERING, REVISITING, FINISHING}
+    # leaving should not be ready_state because it would be processed instantly
+    # i.e. no poll loop
+    READY_STATES = {NEW, AWAKEN}
+    DEBUG_STATES = {
+        ENTERING, AWAKEN, REVISITING, BLOCKING,
+        WAIT_CHILD, LEAVING, DEAD}
 
-    __slots__ = ("desc", "state", "agent", "agent", "parent", "children", "children_states", "index")
+    __slots__ = ("desc", "_state", "agent", "parent", "children", "children_states", "index")
     multiple_children = False
+
+    def __repr__(self):
+        return repr(self.desc.debug_info)
 
     def __init__(self, parent, index, node_desc, agent):
         self.desc = defs.NodeDesc(*node_desc)
-        self.state = self.ENTERING
+        self._state = self.NEW
         self.agent = agent
         self.parent = parent
         self.index = index  # index in parent's children list
@@ -26,68 +41,88 @@ class Node(object):
             parent.children[self] = None
         agent.fronts.add(self)
 
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, value):
+        if value in self.DEBUG_STATES:
+            self._state = value
+            if self.agent.debugger:
+                self.agent.debugger.check_debug(self)
+
     def _quick_finish(self, retval):
         """
         this is only to be used by internal nodes other than user action nodes,
         at the end of this method, agent will be polled since
         some event may just have happened
         """
-        assert(retval is True or retval is False)
-        assert(self.state != self.FINISHING)
-        self.state = self.FINISHING
+        # retval is be nothing else
+        # logger.info("%s finished with %s" % (self, retval))
+        assert retval is True or retval is False, retval
+        # _quick_finish can only be called when node is not dead because
+        # after this it will be dead
+        assert self.state != self.DEAD, self.state
         if self.parent:
             self.parent.children[self] = retval
+            # node state would be leaving when called self.leave()
+            self.leave()
+            # node state would be DEAD after backtrace
+            self.backtrace()
 
     def finish(self, retval):
+        if self.state == self.DEAD:
+            # this saves a lot of trouble but somehow hide errors
+            return
         self._quick_finish(retval)
         if not self.agent.processing:
             self.agent.poll()
 
     def block(self):
-        assert(self.state == self.ENTERING)
+        # this is only for action node, not for composition nodes
+        # can only block on entering
+        assert self.state == self.ENTERING, self.state
         self.state = self.BLOCKING
 
     def visit(self):
-        if self.state == self.ENTERING:
+        # logger.info("%s, %s" %(self, self.state))
+        if self.state == self.NEW:
             self.enter()
-            assert(self.state != self.ENTERING)
-        elif self.state == self.FINISHING:
-            self.leave()
-            self.backtrace()
-            assert(self.state != self.FINISHING)
-        elif self.state == self.REVISITING:
+            # can only be block, finishing
+            assert self.state != self.ENTERING, self.state
+        elif self.state == self.AWAKEN:
             self.revisit()
-            assert(self.state != self.REVISITING)
+            assert self.state != self.REVISITING, self.state
         else:
             return False
         return True
 
     def enter(self):
-        raise NotImplemented
+        self.state = self.ENTERING
 
     def leave(self):
-        pass
+        self.state = self.LEAVING
 
     def backtrace(self):
-        assert(self in self.agent.fronts)
-        assert(self.parent.state in {self.REVISITING, self.BLOCKING, self.WAIT_CHILD})
-        self.parent.state = self.REVISITING
+        # parent should still be valid and waiting
+        assert self in self.agent.fronts, (self, self.agent.fronts)
+        assert self.parent.state in {self.AWAKEN, self.WAIT_CHILD}, self.parent.state
         self.agent.fronts.remove(self)
+        self.state = self.DEAD
         self.agent.fronts.add(self.parent)
+        self.parent.state = self.AWAKEN
         """
-        we can not delete children from parent's children because prent may
+        we can not delete children from parent's children because parent may
         need to collect children returned value
         #self.parent.children.pop(self)
         """
-        self.state = self.DEAD
 
     def push_child(self, n):
-        assert(
-            self is None or
-            self.multiple_children or
-            ((not self.multiple_children) and self in self.agent.fronts))
+        assert self in self.agent.fronts, self.state
         c = defs.NodeDesc(*self.desc.children[n])
-        self.wait_for_child()
+        if not self.multiple_children:
+            self.wait_for_child()
         self.agent.push_node(self, n, c)
 
     def wait_for_child(self):
@@ -101,12 +136,12 @@ class Node(object):
         self.leave()
         if self in self.agent.fronts:
             self.agent.fronts.remove(self)
-        for k, v in self.children:
-            v.interrupt()
+        for k in self.children:
+            k.interrupt()
         self.state = self.DEAD
 
     def revisit(self):
-        raise NotImplemented
+        self.state = self.REVISITING
 
     def clear_children(self):
         self.children.clear()
@@ -127,6 +162,9 @@ class Node(object):
         else:
             return False
 
+    def get_location_info(self):
+        return self.desc.debug_info, self.state
+
 
 class Root(Node):
     """
@@ -140,9 +178,11 @@ class Root(Node):
         super(Root, self).__init__(parent, index, node_desc, agent)
 
     def enter(self):
+        super(Root, self).enter()
         self.push_child(0)
 
     def revisit(self):
+        super(Root, self).revisit()
         is_real_root = self.parent is None
         if is_real_root:
             self.clear_children()
@@ -160,9 +200,11 @@ class Sequence(Node):
         super(Sequence, self).__init__(*args, **kwargs)
 
     def enter(self):
+        super(Sequence, self).enter()
         self.push_child(0)
 
     def revisit(self):
+        super(Sequence, self).revisit()
         # check result
         ret = self.get_single_result()
         if ret is False:
@@ -186,10 +228,12 @@ class RandomSequence(Node):
         super(RandomSequence, self).__init__(parent, index, node_desc, agent)
 
     def enter(self):
+        super(RandomSequence, self).enter()
         idx = self.order.pop(-1)
         self.push_child(idx)
 
     def revisit(self):
+        super(RandomSequence, self).revisit()
         ret = self.get_single_result()
         if ret is False:
             self._quick_finish(False)
@@ -210,9 +254,11 @@ class Select(Node):
         super(Select, self).__init__(*args, **kwargs)
 
     def enter(self):
+        super(Select, self).enter()
         self.push_child(0)
 
     def revisit(self):
+        super(Select, self).revisit()
         # check result
         ret = self.get_single_result()
         if ret is True:
@@ -241,12 +287,14 @@ class Probability(Node):
     __slots__ = ()
 
     def enter(self):
+        super(Probability, self).enter()
         high = self.desc.data[-1]
         rv = random.uniform(0, high)
         idx = bsearch(self.desc.data, 0, len(self.desc.data), rv)
         self.push_child(idx)
 
     def revisit(self):
+        super(Probability, self).revisit()
         ret = self.get_single_result()
         self._quick_finish(ret)
 
@@ -263,10 +311,12 @@ class IfElse(Node):
         super(IfElse, self).__init__(*args, **kwargs)
 
     def enter(self):
+        super(IfElse, self).enter()
         self.internal_state = self.CONDITION_EXECUTED  # condition node executed
         self.push_child(0)
 
     def revisit(self):
+        super(IfElse, self).revisit()
         if self.internal_state == self.CONDITION_EXECUTED:
             self.internal_state = self.BRANCH_EXECUTED  # branch node executed
             ret = self.get_single_result()
@@ -287,17 +337,21 @@ class Parallel(Node):
     __slots__ = ()
 
     def enter(self):
+        super(Parallel, self).enter()
         n = len(self.desc.children)
         for idx in range(0, n):
             self.push_child(idx)
+        self.wait_for_child()
 
     def revisit(self):
+        super(Parallel, self).revisit()
         finished = []
         for k, v in self.children.items():
             if v is not None:
                 finished.append((k, v))
             else:
                 k.interrupt()
+        assert len(finished) > 0
         retval = finished[0][1]  # choose any(in most cases there should be only 1)
         if self not in self.agent.fronts:
             # manually put self back on front since interrupt do not do this
@@ -319,30 +373,36 @@ class Until(Node):
         super(Until, self).__init__(*args, **kwargs)
 
     def enter(self):
-        self.internal_state = self.CHILD
+        super(Until, self).enter()
+        # do predicate check first
         self.push_child(0)
 
     def revisit(self):
+        super(Until, self).revisit()
         if self.internal_state == self.PREDICATE:
-            self.clear_children()
-            self.internal_state = self.CHILD
-            self.push_child(0)
-        else:
+            # predicate node returned, check it
             ret = self.get_single_result()
             if ret is True:
                 self._quick_finish(True)
             else:
-                self.internal_state = self.PREDICATE
+                self.internal_state = self.CHILD
                 self.push_child(1)
+        else:
+            # action node finished, the result does not matter
+            self.clear_children()
+            self.internal_state = self.PREDICATE
+            self.push_child(0)
 
 
 class Not(Node):
     __slots__ = ()
 
     def enter(self):
+        super(Not, self).enter()
         self.push_child(0)
 
     def revisit(self):
+        super(Not, self).revisit()
         ret = self.get_single_result()
         self._quick_finish(not ret)
 
@@ -351,9 +411,11 @@ class Always(Node):
     __slots__ = ()
 
     def enter(self):
+        super(Always, self).enter()
         self.push_child(0)
 
     def revisit(self):
+        super(Always, self).revisit()
         self._quick_finish(self.desc.data)
 
 
@@ -361,26 +423,31 @@ class Call(Node):
     __slots__ = ()
 
     def enter(self):
+        super(Call, self).enter()
         tree_name = self.desc.data
         c = loader.get_root_desc(tree_name)
         self.wait_for_child()
         self.agent.push_node(self, 0, c)
 
     def revisit(self):
+        super(Call, self).revisit()
         ret = self.get_single_result()
         self._quick_finish(ret)
 
 
 class Action(Node):
-    __slots__ = ()
+    __slots__ = ("node_state",)
 
     def enter(self):
-        self.block()  # this is the default action
+        super(Action, self).enter()
         action_name = self.desc.data[0][0]
         action_args = self.desc.data[0][1:]
         self.agent.agent_action(self, action_name, action_args)
+        if self.state == self.ENTERING:
+            self.block()  # this is the default action
 
     def leave(self):
+        super(Action, self).leave()
         action_name = self.desc.data[1][0]
         action_args = self.desc.data[1][1:]
         self.agent.agent_action(self, action_name, action_args)
@@ -390,6 +457,7 @@ class Compute(Node):
     __slots__ = ()
 
     def enter(self):
+        super(Compute, self).enter()
         oargs = self.desc.data[2]
         func = self.desc.data[0]
         iargs = self.desc.data[1]
@@ -401,6 +469,7 @@ class Condition(Node):
     __slots__ = ()
 
     def enter(self):
+        super(Condition, self).enter()
         func = self.desc.data[0]
         iargs = self.desc.data[1]
         r = self.agent.evaluate(func, iargs)
@@ -412,6 +481,7 @@ class WaitFor(Node):
     __slots__ = ()
 
     def enter(self):
+        super(WaitFor, self).enter()
         self.block()
 
     def is_waiting_for(self, event):
@@ -442,27 +512,28 @@ _type_to_class = {
 def get_node_class(node_type):
     return _type_to_class[node_type]
 
+
 if __name__ == "__main__":
     a = (1, 2, 3, 4)
-    i = bsearch(a, 0, len(a), 0)
-    print(i)
+    ii = bsearch(a, 0, len(a), 0)
+    print(ii)
 
     a = (1, 2, 3, 4)
-    i = bsearch(a, 0, len(a), 1)
-    print(i)
+    ii = bsearch(a, 0, len(a), 1)
+    print(ii)
 
     a = (1, 2, 3, 4)
-    i = bsearch(a, 0, len(a), 1.1)
-    print(i)
+    ii = bsearch(a, 0, len(a), 1.1)
+    print(ii)
 
     a = (1, 2, 3, 4)
-    i = bsearch(a, 0, len(a), 2)
-    print(i)
+    ii = bsearch(a, 0, len(a), 2)
+    print(ii)
 
     a = (1, 2, 3, 4)
-    i = bsearch(a, 0, len(a), 2.2)
-    print(i)
+    ii = bsearch(a, 0, len(a), 2.2)
+    print(ii)
 
     a = (1, 2, 3, 4)
-    i = bsearch(a, 0, len(a), 3)
-    print(i)
+    ii = bsearch(a, 0, len(a), 3)
+    print(ii)

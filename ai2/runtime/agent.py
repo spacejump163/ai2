@@ -1,3 +1,4 @@
+# -*- encoding: utf-8 -*-
 import logging
 import collections
 
@@ -6,7 +7,7 @@ import ai2.runtime.nodes as nodes
 import ai2.runtime.defs as defs
 import ai2.runtime.loader as loader
 
-logger = logging.getLogger("ai")
+logger = logging.getLogger(__name__)
 
 
 class Agent(object):
@@ -29,6 +30,10 @@ class Agent(object):
 
         # blackboard
         self.blackboard = {}
+
+        # debug
+        self.debugger = None
+        self.debug_id = None
 
     def enable(self, on_off):
         """
@@ -78,6 +83,7 @@ class Agent(object):
                 head -= 1
         if receiver is None:
             return False
+        self.stop_btree()
         for fsmi in range(tail, head, -1):
             f = self.fsm_stack[fsmi]
             f.pop_self()
@@ -126,7 +132,8 @@ class Agent(object):
 
     def _stop(self):
         self._enabled = False
-        raise NotImplemented
+        self.stop_btree()
+        self.stop_all_fsm()
 
     def is_ready(self):
         for n in self.fronts:
@@ -152,15 +159,34 @@ class Agent(object):
         r = eval(formula, {}, local)
         return r
 
+    def stop_btree(self):
+        if self.btree:
+            self.btree.interrupt()
+        self.btree = None
+
+    def stop_all_fsm(self):
+        while len(self.fsm_stack):
+            self.fsm_stack[-1].pop_self()
+
     def push_node(self, parent, child_index, node_desc):
+        """
+        push a node as the child of a parent, note that this node would not enter
+        immediately, so a parent can push several children and guaranteed not to
+        be interrupted
+        """
+        if parent is None:
+            # we are pushing a root
+            # we are changing to a new btree
+            self.stop_btree()
         clz = nodes.get_node_class(node_desc[0])
-        clz(parent, child_index, node_desc, self)
+        new_node = clz(parent, child_index, node_desc, self)
+        if parent is None:
+            self.btree = new_node
 
     def poll_fronts(self):
         need_process = False
         for n in self.fronts:
-            if n.state != n.BLOCKING:
-                assert(n.state in n.READY_STATES)
+            if n.state in n.READY_STATES:
                 need_process = True
                 break
         if not need_process:
@@ -176,9 +202,8 @@ class Agent(object):
             for n in visit_set:
                 # note that when parallel return, some node in visit_set
                 # will become DEAD before visited
-                if n.state != n.BLOCKING and n.state != n.DEAD:
+                if n.state in n.READY_STATES:
                     has_ready = True
-                    assert(n.state in n.READY_STATES)
                     n.visit()
         self.processing = False
         return True  # processed something
@@ -207,49 +232,7 @@ class Agent(object):
             if ret0 is False and ret1 is False:
                 break
 
-
-class ActionAgent(Agent):
-    def log(self, node, msg):
-        logger.debug("%s:%s:%s" % (self, node,  msg))
-        node.finish(True)
-
-    def push_fsm(self, node, fsm_name):
-        nfsm = fsm.Fsm(fsm_name)
-        nfsm.push_self(self)
-
-    def push_tree(self, node, tree_name):
-        c = loader.get_root_desc(tree_name)
-        self.push_node(None, 0, c)
-
-    def set_blackboard(self, node, dst_name, expression):
-        val = eval(expression, None, None)
-        self.set_value((defs.PAR_BB, dst_name, val))
-
-    def nop(self, node):
-        logger.info("nop action called")
-
-    def nop_enter(self, node):
-        logger.debug("%s:entered nop action node" % self)
-        node.finish(True)
-
-    def nop_leave(self, node):
-        logger.debug("%s:leaving nop action node" % self)
-
-    def test_action_enter(self, node, para):
-        logger.debug("%s:entered test action node" % self)
-
-        def cb(state):
-            node.finish(state)
-        self.blackboard[para] = (cb, True)
-
-    def test_action_leave(self, node, para):
-        self.blackboard[para] = False
-
-
-    to_export = (
-        log, push_fsm, push_tree, set_blackboard,
-        nop_enter, nop_leave,
-        test_action_enter, test_action_leave,
-    )
-
-to_export = {ActionAgent}
+    def get_exec_state(self):
+        # stack info
+        # btree fonts info
+        pass

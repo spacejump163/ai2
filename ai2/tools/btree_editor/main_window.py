@@ -1,9 +1,10 @@
 # -*- encoding: utf-8 -*-
+import json
 import pickle
 import sys
 import os
 
-from PyQt5.QtWidgets import QApplication, QFileDialog, QTabWidget, QMdiArea
+from PyQt5.QtWidgets import QApplication, QFileDialog, QTabWidget, QMdiArea, QDialog
 from PyQt5.QtCore import Qt
 from PyQt5.uic import loadUi
 
@@ -58,6 +59,10 @@ class BTreeEditorMainWindow(object):
         self.window.actionCopy.triggered.connect(self.action_copy_handler)
         self.window.actionPaste.triggered.connect(self.action_paste_handler)
         self.window.actionCut.triggered.connect(self.action_cut_handler)
+        self.window.actionMoveUp.triggered.connect(self.action_move_up_handler)
+        self.window.actionMoveDown.triggered.connect(self.action_move_down_handler)
+
+        self.window.actionAgent.triggered.connect(self.action_select_agent_handler)
 
     def init_common_logic(self):
         self.tree_fragment = None
@@ -75,6 +80,9 @@ class BTreeEditorMainWindow(object):
 
     def remove_instance(self, ins):
         self.instances.remove(ins)
+
+    def add_instance(self, ins):
+        self.instances.append(ins)
 
     def add_dock_content(self, widget):
         self.clear_dock_contents()
@@ -171,8 +179,8 @@ class BTreeEditorMainWindow(object):
         self.mdi.closeAllSubWindows()
 
     def action_export_handler(self):
-        fsm_files = os.listdir(config.src_path)
-        for fn in fsm_files:
+        files = os.listdir(config.src_path)
+        for fn in files:
             full_name = os.path.join(config.src_path, fn)
             b, e = os.path.splitext(full_name)
             if e == BTREE_FILE_EXT:
@@ -180,7 +188,7 @@ class BTreeEditorMainWindow(object):
                 basename, e = os.path.splitext(fn)
                 model_object = pickle.load(f)
                 f.close()
-                exporter = BTreeModelPythonExporter(model_object)
+                exporter = BTreeModelPythonExporter(model_object, src_hint=fn)
                 exporter.export(os.path.join(config.export_path, basename + "_btree.py"))
 
     def action_insert_handler(self):
@@ -213,6 +221,26 @@ class BTreeEditorMainWindow(object):
             return
         self.tree_fragment = w.instance.vm.cut_handler()
 
+    def action_move_up_handler(self):
+        w = self.mdi.activeSubWindow()
+        if w is None:
+            return
+        w.instance.vm.switch_node_handler(-1)
+
+    def action_move_down_handler(self):
+        w = self.mdi.activeSubWindow()
+        if w is None:
+            return
+        w.instance.vm.switch_node_handler(1)
+
+    def action_select_agent_handler(self):
+        w = self.mdi.activeSubWindow()
+        if w is None:
+            return
+        ret = SelectAgentDialog(w.instance.model.agent_class_name).run()
+        if ret is not None:
+            w.instance.model.agent_class_name = ret
+
     def active_subwindow_changed(self, subwindow):
         if subwindow and self.active_instance and subwindow is self.active_instance.sub_window:
             return
@@ -231,6 +259,34 @@ class BTreeEditorMainWindow(object):
             next_instance.activation_handler()
         self.active_instance = next_instance
 
+
+SELECT_AGENT_UI_PATH = os.path.join(
+    this_path,
+    "../../../res/gui/btree_select_agent_dialog.ui")
+
+
+class SelectAgentDialog(object):
+    def __init__(self, current):
+        self.window = loadUi(SELECT_AGENT_UI_PATH)
+        self.list = self.window.listWidget
+        with open(config.action_info_path) as action_info_file:
+            info = json.load(action_info_file)
+        self.keys = keys = list(info.keys())
+        for i in keys:
+            self.list.addItem(i)
+        if current in info:
+            self.list.setCurrentRow(keys.index(current))
+        else:
+            self.list.setCurrentRow(0)
+
+
+    def run(self):
+        ret = self.window.exec()
+        if ret == QDialog.Accepted:
+            row = self.list.currentRow()
+            return self.keys[row]
+        else:
+            return None
 
 def run():
     app = QApplication(sys.argv)

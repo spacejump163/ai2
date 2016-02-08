@@ -1,6 +1,5 @@
 # -*- encoding: utf-8 -*-
 import os
-from PyQt5.QtGui import QPen
 
 from PyQt5.QtWidgets import QGraphicsView, QMessageBox, QGraphicsScene
 from PyQt5.QtCore import Qt, QRectF, QPointF, QLineF
@@ -15,13 +14,13 @@ AREA = QRectF(-AREA_WIDTH / 2, -AREA_HEIGHT / 2, AREA_WIDTH, AREA_HEIGHT)
 
 
 class BTreeInstanceVM(object):
-    def __init__(self, model, parent, file_path):
-        self.file_path = os.path.abspath(file_path)
+    def __init__(self, model, parent, file_name):
+        self.file_name = file_name
+        self.file_path = os.path.abspath(file_name)
         self.modified = False
         self.model = model
         self.parent = parent
         self.current_graphics_node = None
-        self.selection_graphics = None
 
         self.init_view()
         self.sub_window = parent.mdi.addSubWindow(self.btree_view)
@@ -29,9 +28,8 @@ class BTreeInstanceVM(object):
         self.sub_window.setAttribute(Qt.WA_DeleteOnClose)
         self.update_title()
         self.btree_view.closeEvent = self.close_handler
-        parent.instances.append(self)
+        parent.add_instance(self)
         self.sub_window.show()
-
 
         self.vm.refresh()
 
@@ -71,3 +69,12 @@ class BTreeInstanceVM(object):
     def deactivation_handler(self):
         #print("%s about to be deactivated" % self)
         self.vm.cancel_selection()
+
+    def focus_on(self, node_id):
+        self.parent.mdi.setActiveSubWindow(self.sub_window)
+        node = self.model.get_node(node_id)
+        if node is None:
+            return False
+        self.vm.selected_node = node
+        self.vm.refresh()
+        return True

@@ -61,7 +61,13 @@ class BoxOutline(QGraphicsItem):
         return self.rect
 
     def paint(self, painter, option, widget=None):
-        painter.setPen(Qt.black)
+        p = QPen(Qt.black)
+        if self.isSelected():
+            p.setWidth(5)
+            painter.setPen(p)
+        else:
+            p.setWidth(1)
+            painter.setPen(p)
         painter.setBrush(self.bg_color)
         r = self.rect.height() / 8.0
         painter.drawRoundedRect(self.rect, r, r)
@@ -98,9 +104,9 @@ class BasicNode(QGraphicsItemGroup):
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemSelectedChange:
             self.manager.selection_changed(self, value)
+            return value
         else:
-            pass
-        return super(BasicNode, self).itemChange(change, value)
+            return super(BasicNode, self).itemChange(change, value)
 
     def get_width(self):
         return self.boundingRect().width()
@@ -192,7 +198,6 @@ class NodeEditorVM(object):
         self.model = model
         self.parent_vm = parent_vm
         self.selected_node = None
-        self.selected_effect = None
         self.graphics_root = None
 
     ###########################################################################
@@ -227,13 +232,13 @@ class NodeEditorVM(object):
         return n
 
     def find_graphics_for_node(self, model):
-        return self.search_func(self.graphics_root, model)
+        return self.search_node_for_model(self.graphics_root, model)
 
-    def search_func(self, root, model):
+    def search_node_for_model(self, root, model):
         if root.model is model:
             return root
         for c in root.children:
-            r = self.search_func(c, model)
+            r = self.search_node_for_model(c, model)
             if r:
                 return r
         return None
@@ -274,22 +279,10 @@ class NodeEditorVM(object):
         return QRectF(c - r, c + r)
 
     def show_selection_effect(self):
-        if self.selected_node is None:
-            return
-        selection_pen = QPen()
-        selection_pen.setWidth(5)
-        cnode = self.find_graphics_for_node(self.selected_node)
-        rect = cnode.boundingRect()
-        self.selected_effect = self.scene.addRect(self.enlarge_rect(rect), selection_pen)
-        self.selected_effect.setPos(cnode.pos())
-        self.selected_effect.setZValue(0.5)
         self.parent_vm.parent.add_dock_content(self.selected_node.get_editor(self.refresh))
 
     def clean_selection_effect(self):
         self.parent_vm.parent.clear_dock_contents()
-        if self.selected_effect:
-            self.scene.removeItem(self.selected_effect)
-        self.selected_effect = None
 
     ###########################################################################
     # graph editing related
@@ -340,6 +333,11 @@ class NodeEditorVM(object):
         self.refresh()
         return fragment
 
+    def switch_node_handler(self, step):
+        if self.selected_node is None:
+            return
+        sibling = self.model.switch_sibling(self.selected_node, step)
+        self.refresh()
 
     @staticmethod
     def copy_subtree(node):

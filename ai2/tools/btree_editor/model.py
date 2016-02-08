@@ -50,15 +50,16 @@ class NodeModel(object):
         ("color", ColorProvider),
     )
 
-    def __init__(self):
-        self.uid = 0
+    def __init__(self, uid, tree):
+        self.tree = tree
+        self.uid = uid
         self.children = []
         self.parent = None
         self.editable_info = TypedValueBuilder.build_object(self.EIT, "info")
 
     @property
     def debug_info(self):
-        return ""
+        return SymbolName("__src_file__"), self.uid
 
     def to_tuple(self):
         data = self.data_to_tuple()
@@ -177,9 +178,6 @@ class AlwaysModel(NodeModel):
 
     EIT = NodeModel.EIT + (("truth_value", True),)
 
-    def __init__(self):
-        super(AlwaysModel, self).__init__()
-
     def data_to_tuple(self):
         return self.editable_info.truth_value.get_value()
 
@@ -194,23 +192,43 @@ class CallModel(NodeModel):
         return self.editable_info.tree_name
 
 
-def init_action_data():
+def init_action_data(class_name):
     choices = ["no action"]
     values = [""]
     arglists = [()]
     with open(config.action_info_path) as action_info_file:
-        action_info = json.load(action_info_file)
-    for pkg_name, clzs in action_info.items():
-        for clz_name, acts in clzs.items():
-            for act_name, arglist in acts.items():
-                choices.append("%s.%s" % (clz_name, act_name))
-                values.append(act_name)
-                arglists.append(arglist)
+        info = json.load(action_info_file)
+    class_info = info[class_name]
+    choices += [i[0] for i in class_info]
+    values += [i[0] for i in class_info]
+    arglists += [i[1:] for i in class_info]
     return choices, values, arglists
 
 
 class MethodNameProvider(ChoiceProvider):
-    choices, values, arglists = init_action_data()
+    with open(config.action_info_path) as action_info_file:
+        info = json.load(action_info_file)
+
+    @property
+    def choices(self):
+        default = ["no action"]
+        class_info = self.info[self.class_name]
+        return default + [i[0] for i in class_info]
+
+    @property
+    def values(self):
+        default = [""]
+        class_info = self.info[self.class_name]
+        return default + [i[0] for i in class_info]
+
+    @property
+    def arglists(self):
+        default = [()]
+        class_info = self.info[self.class_name]
+        return default + [i[1:] for i in class_info]
+
+    def __init__(self, class_name):
+        self.class_name = class_name
 
 
 class ParamTypeProvider(ChoiceProvider):
@@ -235,14 +253,17 @@ class ActionModel(NodeModel):
         ("var_name", ""),
     )
 
-    EIT = NodeModel.EIT + (
-        ("enter", (
-            ("act_name", MethodNameProvider),
-        )),
-        ("leave", (
-            ("act_name", MethodNameProvider),
-        ))
-    )
+    @property
+    def EIT(self):
+        template = NodeModel.EIT + (
+            ("enter", (
+                ("act_name", MethodNameProvider(self.tree.agent_class_name)),
+            )),
+            ("leave", (
+                ("act_name", MethodNameProvider(self.tree.agent_class_name)),
+            ))
+        )
+        return template
 
     @staticmethod
     def translate_action_struct(astruct):
@@ -412,9 +433,9 @@ class WaitForModel(NodeModel):
 
 class BTreeModel(object):
     def __init__(self):
-        self.root = RootModel()
-        self.root.uid_cnt = 0
+        self.root = RootModel(0, self)
         self.uid_cnt = 0
+        self.agent_class_name = "ActionAgent"
 
     def get_uid(self):
         self.uid_cnt += 1
@@ -428,8 +449,7 @@ class BTreeModel(object):
 
     def add_node_clz(self, parent, clz, idx):
         uid = self.get_uid()
-        node = clz()
-        node.uid = uid
+        node = clz(uid, self)
         parent.add_child(node, idx)
         return node
 
@@ -446,6 +466,16 @@ class BTreeModel(object):
         parent = node.parent
         parent.children.remove(node)
         node.parent = None
+
+    def switch_sibling(self, node, step):
+        c = node.parent.children
+        if node.parent is None:
+            return
+        i = c.index(node)
+        ni = i + step
+        if ni < 0 or ni >= len(node.parent.children):
+            return
+        c[ni], c[i] = c[i], c[ni]
 
     def get_node(self, uid):
         return self.get_node_recursive(self.root, uid)
@@ -479,8 +509,8 @@ node_template = """
 """
 
 file_header = """
-info = __file__
-
+# -*- encoding: utf-8 -*-
+__src_file__ = {SRC_FILE}
 """
 
 file_tail = """
@@ -491,11 +521,12 @@ root = {ROOT_NAME}
 class BTreeModelPythonExporter(object):
     PPRINT_WIDTH = 40
 
-    def __init__(self, btree_model):
+    def __init__(self, btree_model, src_hint=""):
         self.btree_model = btree_model
+        self.src_hint = src_hint
 
     def export(self, file_path=None):
-        frags = [file_header]
+        frags = [file_header.format(SRC_FILE=repr(self.src_hint))]
         self.dump_recursive(self.btree_model.root, frags)
         tail_def = file_tail.format(ROOT_NAME=self.btree_model.root.get_name())
         frags.append(tail_def)

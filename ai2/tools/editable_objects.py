@@ -279,12 +279,13 @@ class StructValue(TypedValue):
                 return True
         return False
 
+
 class TypedValueBuilder(object):
     table = {}
     @classmethod
     def build_object(cls, template, name=""):
-        tp = type(template)
-        m = cls.table[tp]
+        tp = template.__class__
+        m = cls.table.get(tp, cls.build_enumerator)
         o = m(template, name)
         return o
 
@@ -297,7 +298,6 @@ class TypedValueBuilder(object):
             float: cls.build_float,
             bool: cls.build_bool,
             str: cls.build_str,
-            type(ChoiceProvider): cls.build_enumerator,
         }
 
     @classmethod

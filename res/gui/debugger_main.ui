@@ -29,38 +29,15 @@
      <height>26</height>
     </rect>
    </property>
-   <widget class="QMenu" name="menuFile">
-    <property name="title">
-     <string>File</string>
-    </property>
-    <addaction name="actionNew"/>
-    <addaction name="actionOpen"/>
-    <addaction name="actionSave"/>
-    <addaction name="actionSave_As"/>
-    <addaction name="actionClose"/>
-    <addaction name="actionClose_All"/>
-    <addaction name="actionExport"/>
-   </widget>
-   <widget class="QMenu" name="menuEdit">
-    <property name="title">
-     <string>Edit</string>
-    </property>
-    <addaction name="actionInsert"/>
-    <addaction name="actionDelete"/>
-    <addaction name="actionCopy"/>
-    <addaction name="actionPaste"/>
-    <addaction name="actionCut"/>
-    <addaction name="actionMoveUp"/>
-    <addaction name="actionMoveDown"/>
-   </widget>
    <widget class="QMenu" name="menuOption">
     <property name="title">
      <string>option</string>
     </property>
-    <addaction name="actionAgent"/>
+    <addaction name="actionResume"/>
+    <addaction name="actionStop"/>
+    <addaction name="actionFollow"/>
+    <addaction name="actionHold"/>
    </widget>
-   <addaction name="menuFile"/>
-   <addaction name="menuEdit"/>
    <addaction name="menuOption"/>
   </widget>
   <widget class="QDockWidget" name="dockWidget">
@@ -211,9 +188,9 @@
     <string>Ctrl+X</string>
    </property>
   </action>
-  <action name="actionAgent">
+  <action name="actionStop">
    <property name="text">
-    <string>Agent</string>
+    <string>Stop</string>
    </property>
   </action>
   <action name="actionMoveUp">
@@ -230,6 +207,21 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+Down</string>
+   </property>
+  </action>
+  <action name="actionFollow">
+   <property name="text">
+    <string>Follow</string>
+   </property>
+  </action>
+  <action name="actionResume">
+   <property name="text">
+    <string>Resume</string>
+   </property>
+  </action>
+  <action name="actionHold">
+   <property name="text">
+    <string>Hold</string>
    </property>
   </action>
  </widget>
